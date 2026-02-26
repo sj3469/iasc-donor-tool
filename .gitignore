@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Environment
+.env
+
+# Generated database (regenerate with: python data/generate_mock_data.py)
+data/donors.db
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
