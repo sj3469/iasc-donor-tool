@@ -3,7 +3,6 @@ IASC Donor Analytics — Streamlit application.
 
 Main entry point: streamlit run src/app.py
 """
-
 import sys
 from pathlib import Path
 import streamlit as st
