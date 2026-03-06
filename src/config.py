@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # 1. Load local .env for local testing
 load_dotenv()
 
-# 2. Key Title & Text
+# 2. Page Metadata
 APP_TITLE = "IASC Donor Analytics"
 APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Review"
 
@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "donors.db"
 
 # 4. API Key Resolution (Web vs Local)
-# This looks for the label "GEMINI_API_KEY" in your Streamlit Secrets Dashboard.
+# This pulls from Streamlit Secrets (Dashboard). Do NOT paste AIzaSy here.
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 # 5. Model Settings
@@ -25,8 +25,7 @@ AVAILABLE_MODELS = {
 }
 DEFAULT_MODEL = "gemini-2.0-flash"
 
-# 6. Inject key into environment ONLY if it exists [CRITICAL FIX]
-# We use the variable 'GEMINI_API_KEY' defined on line 19. 
-# We do NOT paste the AIzaSy string here.
+# 6. Environment Injection
+# We use the variable name GEMINI_API_KEY (no extra quotes around the variable).
 if GEMINI_API_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
