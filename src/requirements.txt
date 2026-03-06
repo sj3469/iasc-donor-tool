@@ -2,4 +2,3 @@ anthropic
 google-genai
 google-cloud-secret-manager
 pandas
-sqlite3
