@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional, Callable
 from google import genai
 from google.genai import types
 
-# Import the specific database tools from your queries.py
+# Import the donor database tools
 from queries import (
     search_donors, 
     get_donor_detail, 
@@ -25,48 +25,38 @@ def get_response(
     st_session_id: Optional[str] = None,
     attachment: Optional[Any] = None
 ) -> tuple[str, Any]:
-    """
-    Main execution loop for Gemini.
-    Handles user prompts, file attachments, and database tool calling.
-    """
     
-    # Initialize the Gemini Client
-    # It automatically looks for the "GEMINI_API_KEY" we set in config.py
+    # Client looks for GEMINI_API_KEY in environment
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-    # 1. Register your Python functions as "Tools"
+    # Register functions as Tools
     tools = [
         search_donors, get_donor_detail, get_summary_statistics,
         get_geographic_distribution, get_lapsed_donors,
         get_prospects_by_potential, plan_fundraising_trip
     ]
 
-    # 2. Prepare the prompt content (Text + optional File)
     prompt_content = [user_message]
     
     if attachment:
-        if progress_callback:
-            progress_callback(f"Analyzing {attachment.name}...")
-        # Upload file to Gemini's vision/analysis system
+        if progress_callback: progress_callback(f"Analyzing {attachment.name}...")
         file_handle = client.files.upload(file=attachment)
         prompt_content.append(file_handle)
 
-    # 3. Call Gemini with Automatic Function Calling
-    if progress_callback:
-        progress_callback("Consulting IASC donor database...")
+    if progress_callback: progress_callback("Consulting IASC donor database...")
 
+    # Execute with Automatic Function Calling
+    # Removed max_remote_calls to fix the validation error
     response = client.models.generate_content(
         model=model,
         contents=prompt_content,
         config=types.GenerateContentConfig(
             system_instruction=build_system_prompt(),
             tools=tools,
-            # 'auto' allows Gemini to decide when to call search_donors, etc.
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(max_remote_calls=5)
+            automatic_function_calling=types.AutomaticFunctionCallingConfig()
         )
     )
 
-    # 4. Log usage metrics to your tracker
     usage = response.usage_metadata
     session_tracker.log_call(
         model=model,
