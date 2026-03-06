@@ -2,3 +2,4 @@ anthropic
 google-genai
 google-cloud-secret-manager
 pandas
+python-dotenv
