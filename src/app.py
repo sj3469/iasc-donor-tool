@@ -33,7 +33,6 @@ def inject_css() -> None:
         <style>
         :root {
             --bg: #f7f8fb;
-            --bg-soft: #f1f3f8;
             --panel: #ffffff;
             --panel-2: #f8f9fc;
             --border: #d8deea;
@@ -43,9 +42,10 @@ def inject_css() -> None:
             --accent-hover: #1c273b;
             --chip: #eef2f8;
             --sidebar-bg: #0f1728;
-            --sidebar-border: #1f2a40;
+            --sidebar-border: #25324a;
             --sidebar-text: #ffffff;
-            --sidebar-muted: #d1d8e8;
+            --sidebar-muted: #eef3ff;
+            --sidebar-line: #e8edf7;
         }
 
         html, body, [class*="css"] {
@@ -68,8 +68,22 @@ def inject_css() -> None:
 
         [data-testid="stSidebar"] .stCaption,
         [data-testid="stSidebar"] small,
-        [data-testid="stSidebar"] .small-muted {
-            color: var(--sidebar-muted) !important;
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div {
+            color: var(--sidebar-text) !important;
+        }
+
+        [data-testid="stSidebar"] input::placeholder,
+        [data-testid="stSidebar"] textarea::placeholder {
+            color: var(--sidebar-text) !important;
+            opacity: 1 !important;
+        }
+
+        [data-testid="stSidebar"] hr {
+            border: none !important;
+            border-top: 1px solid var(--sidebar-line) !important;
         }
 
         .block-container {
@@ -153,13 +167,17 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] > div {
             background: var(--panel) !important;
-            border: 1px solid var(--border) !important;
+            border: none !important;
+            outline: none !important;
             border-radius: 18px !important;
             box-shadow: none !important;
         }
 
         div[data-testid="stChatInput"] textarea {
             color: var(--text) !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
         }
 
         .usage-box {
@@ -247,6 +265,8 @@ def ensure_state() -> None:
         st.session_state.tracker = SessionTracker()
     if "thread_search" not in st.session_state:
         st.session_state.thread_search = ""
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = DEFAULT_MODEL
 
 
 def get_active_thread() -> dict:
@@ -336,10 +356,10 @@ def build_effective_prompt(prompt: str, donor_status_filter: str, state_filter: 
         return prompt
 
     return (
-        prompt
-        + "\n\nDefault sidebar filters to apply if relevant:\n- "
+        "Apply these sidebar filters unless the user explicitly overrides them:\n- "
         + "\n- ".join(notes)
-        + "\nIf the user's request explicitly conflicts with these defaults, follow the user's request."
+        + "\n\nUser question:\n"
+        + prompt
     )
 
 
@@ -402,10 +422,10 @@ with st.sidebar:
             st.session_state.get("selected_model", DEFAULT_MODEL)
         ),
     )
-    st.session_state["selected_model"] = selected_model
+    st.session_state.selected_model = selected_model
 
     st.text_input(
-        "Search",
+        "Search threads",
         key="thread_search",
         placeholder="Search threads",
         label_visibility="collapsed",
@@ -421,8 +441,10 @@ with st.sidebar:
         key=lambda t: t.get("updated_at", ""),
         reverse=True,
     )
+
+    history_threads = [t for t in sorted_threads if t.get("messages")]
     visible_threads = [
-        t for t in sorted_threads
+        t for t in history_threads
         if thread_matches_search(t, st.session_state.thread_search)
     ]
 
@@ -467,10 +489,10 @@ with st.sidebar:
             "- Show donor 003XXXXXXXXXXXXXXX"
         )
 
-    with st.expander("Why are some answers short?"):
+    with st.expander("How do filters work?"):
         st.markdown(
-            "Many common donor questions are answered directly from local database helpers, "
-            "so responses may be concise by design."
+            "Filters act as default constraints for broad queries. "
+            "If you ask for a different state or segment explicitly, your prompt should override the sidebar defaults."
         )
 
     st.divider()
@@ -509,7 +531,7 @@ for message in thread["messages"]:
     render_message(message)
 
 submission = st.chat_input(
-    "Ask about your donor community...",
+    " ",
     accept_file="multiple",
     file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
     key="main_chat_input",
@@ -519,7 +541,7 @@ prompt, uploaded_files = parse_chat_submission(submission)
 
 if prompt or uploaded_files:
     attachment_names = [f.name for f in uploaded_files]
-    effective_prompt = build_effective_prompt(prompt, donor_status_filter, state_filter)
+    effective_prompt = build_effective_prompt(prompt, donor_status_filter, state_filter) if prompt else ""
 
     user_display = prompt if prompt else "[Files uploaded]"
     add_message("user", user_display, attachments=attachment_names)
