@@ -1,6 +1,8 @@
 # IASC Donor Analytics
 
-An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets IASC's development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. Claude (Anthropic) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
+An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets a development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. Claude (Anthropic) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
+
+> **This repository uses entirely synthetic data.** The donor database is generated procedurally by `data/generate_mock_data.py` and contains no real names, contact information, giving history, or any other actual IASC data. No real donor data has ever been committed to this repository.
 
 ---
 

@@ -83,7 +83,7 @@ LAST_NAMES = [
 # Zip prefixes chosen for realism (see CLAUDE.md for rationale).
 GEO_CONFIG = [
     # (state, weight, [zip_prefixes])
-    ("VA", 20, ["229", "220", "230"]),   # Charlottesville / Northern VA
+    ("VA", 20, ["229", "220", "230"]),   # Virginia
     ("NY", 15, ["100", "101", "112"]),   # NYC metro
     ("DC", 7,  ["200", "202", "203"]),   # Washington DC
     ("MD", 5,  ["207", "208", "209"]),   # Maryland suburbs
@@ -126,26 +126,26 @@ _STATUS_CHOICES = [s for s, w in STATUS_CONFIG for _ in range(w)]
 # Notes pool — ~30 % of contacts get one
 # ---------------------------------------------------------------------------
 NOTES_POOL = [
-    "Met at UVA event 2019",
+    "Met at conference 2019",
     "Board member referral",
     "Prefers email contact",
-    "Alumna of UVA Batten School",
+    "Longtime subscriber",
     "Interested in planned giving",
-    "Responded to 2022 Year-End Appeal",
+    "Responded to Year-End Appeal",
     "Former colleague of board member",
     "Strong interest in cultural sociology",
     "Subscriber since inception",
-    "Met at Hedgehog Gala 2022",
+    "Met at annual gala",
     "Prefers phone contact",
     "Potential major gift prospect",
     "Works in philanthropic advising",
     "Gave stock gift in 2021",
     "Known DAF holder at Fidelity Charitable",
-    "Attended 2023 UVA Homecoming event",
-    "Connected through Charlottesville arts community",
+    "Attended homecoming reception",
+    "Connected through local arts community",
     "Interested in naming opportunity",
     "Legacy Society prospect",
-    "Annual Fund loyal donor since 2010",
+    "Loyal Annual Fund donor",
 ]
 
 # Campaign names used in the gifts table
@@ -158,8 +158,8 @@ CAMPAIGNS = [
     "Year-End Appeal 2022",
     "Year-End Appeal 2023",
     "Year-End Appeal 2024",
-    "Hedgehog Gala 2022",
-    "Hedgehog Gala 2023",
+    "Spring Gala 2022",
+    "Spring Gala 2023",
     "Spring Appeal 2022",
     "Spring Appeal 2023",
     "Spring Appeal 2024",
@@ -300,9 +300,9 @@ def n_gifts_for_total(total: float) -> int:
 def wealth_score_for_total(total: float) -> int | None:
     """
     Return a 1–10 wealth score loosely correlated with total gifts.
-    Returns None for ~40 % of donors (WealthEngine data not available for all).
+    Returns None for ~35 % of donors (industry-average WealthEngine no-match rate).
     """
-    if random.random() < 0.40:
+    if random.random() < 0.35:  # industry average no-match rate for small nonprofits
         return None
     if total < 500:
         base = random.randint(1, 4)
@@ -428,7 +428,7 @@ def generate_contacts(n: int = 300) -> list[dict]:
             subscription_start_date = sub_start
 
         # --- Email engagement ---
-        if random.random() < 0.15:
+        if random.random() < 0.12:
             email_open_rate      = None
             last_email_click_date = None
         else:
@@ -628,30 +628,30 @@ def _interaction_details(itype: str) -> str | None:
     detail_pool = {
         "email_open": [
             "Year-End Appeal 2023",
-            "Hedgehog Review issue announcement",
+            "Journal issue announcement",
             "Spring fundraising newsletter",
-            "IASC event invitation",
+            "Annual event invitation",
             "Annual Fund thank-you",
             None,
         ],
         "email_click": [
             "Clicked donate button",
             "Clicked event registration link",
-            "Clicked Hedgehog Review article link",
+            "Clicked journal article link",
             None,
         ],
         "event_attended": [
-            "Hedgehog Gala 2022",
-            "Hedgehog Gala 2023",
-            "UVA Homecoming Reception 2023",
-            "IASC Book Launch – Strangers in a Strange Land",
+            "Spring Gala 2022",
+            "Spring Gala 2023",
+            "Homecoming Reception 2023",
+            "Book Launch event",
             "Virtual Symposium on Culture & Democracy",
         ],
         "meeting": [
-            "Introductory meeting with CDO Andrew Westhouse",
+            "Introductory meeting with development director",
             "Stewardship call – discussed giving impact",
             "Major gift conversation – preliminary",
-            "Cultivation lunch in Charlottesville",
+            "Cultivation lunch",
             "Phone meeting rescheduled",
         ],
         "phone_call": [

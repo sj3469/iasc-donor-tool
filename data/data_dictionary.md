@@ -33,11 +33,11 @@ One row per person. This is the primary record linking all donor, subscriber, an
 | `subscription_type` | TEXT | Salesforce | Type of Hedgehog Review subscription: `print`, `digital`, `both`, or `none`. | `digital`, `print`, `both`, `none` | Never NULL; `none` if no subscription exists. |
 | `subscription_status` | TEXT | Salesforce | Current subscription state: `active`, `expired`, or `never` (no subscription of this type was ever held). | `active`, `expired`, `never` | Never NULL. |
 | `subscription_start_date` | DATE | Salesforce | Date the contact's first subscription began. | `2008-09-01`, `2021-01-15` | NULL when `subscription_type` is `none`. |
-| `email_open_rate` | REAL | MailChimp | Proportion of emails opened over the contact's lifetime in MailChimp (0.0–1.0). | `0.28`, `0.05`, `0.71` | NULL for ~15 % of contacts not on the MailChimp list or with no send history. |
+| `email_open_rate` | REAL | MailChimp | Proportion of emails opened over the contact's lifetime in MailChimp (0.0–1.0). | `0.28`, `0.05`, `0.71` | NULL for a minority of contacts not on the MailChimp list or with no send history. |
 | `last_email_click_date` | DATE | MailChimp | Date the contact last clicked a link in a MailChimp email. | `2024-08-14`, `2023-12-01` | NULL if the contact has never clicked, or if MailChimp data is unavailable. |
 | `event_attendance_count` | INTEGER | Salesforce | Total number of IASC events (galas, lectures, receptions) the contact has attended, as logged in Salesforce. | `0`, `2`, `7` | Never NULL; defaults to 0 for contacts with no event history. |
-| `wealth_score` | INTEGER | WealthEngine | Estimated philanthropic giving capacity on a 1–10 scale (10 = highest capacity), sourced from WealthEngine screening. | `3`, `7`, `10` | NULL for ~40 % of contacts not yet screened by WealthEngine. |
-| `notes` | TEXT | Salesforce | Free-text notes entered by development staff, such as meeting context, referral source, or communication preferences. | `Met at UVA event 2019`, `Prefers email contact` | NULL for ~70 % of contacts with no recorded notes. |
+| `wealth_score` | INTEGER | WealthEngine | Estimated philanthropic giving capacity on a 1–10 scale (10 = highest capacity), sourced from WealthEngine screening. | `3`, `7`, `10` | NULL for a significant portion of contacts not yet screened by WealthEngine. |
+| `notes` | TEXT | Salesforce | Free-text notes entered by development staff, such as meeting context, referral source, or communication preferences. | `Met at conference 2019`, `Prefers email contact` | NULL for most contacts with no recorded notes. |
 
 ---
 
@@ -52,7 +52,7 @@ One row per individual gift transaction. Prospects have no rows in this table. T
 | `gift_date` | DATE | Salesforce | Date the gift was received or processed by IASC. Biased toward November–December (year-end giving season). | `2023-12-15`, `2021-11-02` | Never NULL. |
 | `amount` | REAL | Salesforce | Dollar value of this individual gift in USD. Always ≥ $1.00. | `100.00`, `5000.00`, `250000.00` | Never NULL. |
 | `gift_type` | TEXT | Salesforce | Categorization of the gift: `one_time`, `recurring` (part of a pledge or installment plan), `planned_giving` (bequest or deferred gift), or `event` (ticket purchase / event-linked gift). | `one_time`, `recurring` | NULL if not yet categorized in Salesforce. |
-| `campaign` | TEXT | Salesforce | Name of the fundraising campaign the gift is attributed to, as entered in Salesforce. | `Year-End Appeal 2023`, `Hedgehog Gala 2022`, `Annual Fund 2021` | NULL for unrestricted or unattributed gifts (~25 % of rows). |
+| `campaign` | TEXT | Salesforce | Name of the fundraising campaign the gift is attributed to, as entered in Salesforce. | `Year-End Appeal 2023`, `Spring Gala 2022`, `Annual Fund 2021` | NULL for unrestricted or unattributed gifts (a portion of rows). |
 
 ---
 
@@ -66,7 +66,7 @@ One row per logged touchpoint between IASC staff (or systems) and a contact. The
 | `contact_id` | TEXT (FK) | Salesforce / MailChimp | Foreign key referencing `contacts.contact_id`; identifies the contact involved in this interaction. | `003XX00000AbCd1234` | Never NULL; every interaction belongs to a contact. |
 | `interaction_date` | DATE | Salesforce / MailChimp | Date the interaction occurred or was logged. | `2023-04-10`, `2024-11-30` | Never NULL. |
 | `interaction_type` | TEXT | Derived | Categorical type of interaction: `email_open`, `email_click` (from MailChimp), `event_attended`, `meeting`, `phone_call`, or `mail_sent` (from Salesforce). | `email_open`, `meeting`, `event_attended` | Never NULL. |
-| `details` | TEXT | Salesforce / MailChimp | Free-text description of the interaction — campaign name for email events, event name for attendance, brief note for meetings and calls. | `Year-End Appeal 2023`, `Hedgehog Gala 2022`, `Cultivation lunch in Charlottesville` | NULL for ~20 % of interactions where no additional detail was recorded. |
+| `details` | TEXT | Salesforce / MailChimp | Free-text description of the interaction — campaign name for email events, event name for attendance, brief note for meetings and calls. | `Year-End Appeal 2023`, `Spring Gala 2022`, `Cultivation lunch` | NULL for a minority of interactions where no additional detail was recorded. |
 
 ---
 
@@ -74,9 +74,9 @@ One row per logged touchpoint between IASC staff (or systems) and a contact. The
 
 1. **Prospects vs. donors.** Contacts with `donor_status = 'prospect'` have NULL in all gift-related fields (`first_gift_date`, `last_gift_date`, `total_gifts`, `total_number_of_gifts`, `average_gift`, `giving_vehicle`). Query tools must handle this explicitly to avoid filtering out prospects when that population is relevant.
 
-2. **WealthEngine coverage.** Approximately 40 % of contacts lack a `wealth_score` because WealthEngine screening is not run on every record. Absence of a wealth score does not imply low capacity; it means the contact has not yet been screened. Treat NULL wealth scores as missing, not as zero.
+2. **WealthEngine coverage.** A significant portion of contacts lack a `wealth_score` because WealthEngine screening is not run on every record. Absence of a wealth score does not imply low capacity; it means the contact has not yet been screened. Treat NULL wealth scores as missing, not as zero.
 
-3. **MailChimp coverage.** About 15 % of contacts have NULL `email_open_rate`. These are contacts not subscribed to the MailChimp list (e.g., mail-only donors), contacts added after the last MailChimp sync, or contacts who opted out of email.
+3. **MailChimp coverage.** A minority of contacts have NULL `email_open_rate`. These are contacts not subscribed to the MailChimp list (e.g., mail-only donors), contacts added after the last MailChimp sync, or contacts who opted out of email.
 
 4. **`average_gift` is derived.** It is stored for query convenience but is always equal to `total_gifts / total_number_of_gifts`. Do not treat it as an independent field; recompute from the gifts table for transaction-level analysis.
 
