@@ -1,9 +1,12 @@
 import streamlit as st
+import os
+
+# Internal project imports
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
 from token_tracker import SessionTokenTracker
 
-# 1. Page Configuration
+# 1. Page Configuration [Restores your missing titles]
 st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 
 # 2. Initialize Session States
@@ -15,19 +18,22 @@ if "tracker" not in st.session_state:
 # 3. Sidebar UI
 with st.sidebar:
     st.title("⚙️ Settings")
-    selected_model = st.selectbox("Select Model", list(AVAILABLE_MODELS.keys()), 
-                                  format_func=lambda x: AVAILABLE_MODELS[x], 
-                                  index=list(AVAILABLE_MODELS.keys()).index(DEFAULT_MODEL))
+    selected_model = st.selectbox(
+        "Select Model", 
+        list(AVAILABLE_MODELS.keys()), 
+        format_func=lambda x: AVAILABLE_MODELS[x], 
+        index=list(AVAILABLE_MODELS.keys()).index(DEFAULT_MODEL)
+    )
     
     st.divider()
     st.markdown("### 📁 Data Source")
-    st.info("Connected to: `mock_dataset3.csv`")
+    st.info("Connected: `mock_dataset3.csv`")
     
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
 
-# 4. Main UI Header [Restores your missing titles]
+# 4. Main UI Header [Fixes the blank screen issue]
 st.title(APP_TITLE)
 st.subheader(APP_SUBTITLE)
 
