@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -10,7 +11,6 @@ APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Revi
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "donors.db"
-USAGE_DB_PATH = BASE_DIR / "usage.db"
 THREAD_STORE_PATH = BASE_DIR / "threads.json"
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
