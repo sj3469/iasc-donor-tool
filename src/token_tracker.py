@@ -6,23 +6,28 @@ including prompt caching savings. Designed to be displayed inline with
 each response and in the Streamlit sidebar.
 """
 
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import List
 
 
-# Pricing as of early 2025; update these if pricing changes.
-# Source: anthropic.com/pricing
+# Pricing placeholders.
+# These are not accurate for Gemini, but they prevent crashes and allow display.
 MODEL_PRICING = {
-    "claude-sonnet-4-20250514": {
-        "input_per_mtok": 3.00,
-        "output_per_mtok": 15.00,
-        "display_name": "Sonnet",
+    "gemini-2.0-flash": {
+        "input_per_mtok": 0.0,
+        "output_per_mtok": 0.0,
+        "display_name": "Gemini 2.0 Flash",
     },
-    "claude-haiku-4-5-20251001": {
-        "input_per_mtok": 0.80,
-        "output_per_mtok": 4.00,
-        "display_name": "Haiku",
+    "gemini-1.5-pro": {
+        "input_per_mtok": 0.0,
+        "output_per_mtok": 0.0,
+        "display_name": "Gemini 1.5 Pro",
+    },
+    "default": {
+        "input_per_mtok": 0.0,
+        "output_per_mtok": 0.0,
+        "display_name": "Unknown Model",
     },
 }
 
@@ -34,17 +39,17 @@ class APICall:
     input_tokens: int
     output_tokens: int
     model: str
-    had_tool_use: bool
-    latency_ms: float
-    cache_creation_input_tokens: int = 0  # tokens written to cache (charged at 1.25x)
-    cache_read_input_tokens: int = 0      # tokens read from cache (charged at 0.1x)
+    had_tool_use: bool = False
+    latency_ms: float = 0.0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
 
 @dataclass
 class ResponseUsage:
-    """Aggregated usage for one user question (may involve multiple API calls)."""
+    """Aggregated usage for one user question."""
     question: str
-    calls: list = field(default_factory=list)
+    calls: List[APICall] = field(default_factory=list)
 
     @property
     def total_input_tokens(self) -> int:
@@ -75,41 +80,32 @@ class ResponseUsage:
         return sum(c.cache_creation_input_tokens for c in self.calls)
 
     def estimated_cost(self, model: str) -> float:
-        """Estimated cost in dollars, accounting for prompt caching pricing.
-
-        Cache writes: 1.25x normal input rate
-        Cache reads:  0.10x normal input rate
-        Regular input: 1.00x normal input rate
-        """
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["claude-sonnet-4-20250514"])
+        pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
         base_rate = pricing["input_per_mtok"]
+        output_rate = pricing["output_per_mtok"]
 
         total_cost = 0.0
         for call in self.calls:
-            # Regular (non-cached) input tokens
             regular_input = (
                 call.input_tokens
                 - call.cache_creation_input_tokens
                 - call.cache_read_input_tokens
             )
             total_cost += (regular_input / 1_000_000) * base_rate
-            # Cache writes at 1.25x
             total_cost += (call.cache_creation_input_tokens / 1_000_000) * base_rate * 1.25
-            # Cache reads at 0.10x
             total_cost += (call.cache_read_input_tokens / 1_000_000) * base_rate * 0.1
-            # Output tokens
-            total_cost += (call.output_tokens / 1_000_000) * pricing["output_per_mtok"]
+            total_cost += (call.output_tokens / 1_000_000) * output_rate
 
         return total_cost
 
     def format_inline(self, model: str) -> str:
-        """Format for display below a chat response."""
         cost = self.estimated_cost(model)
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["claude-sonnet-4-20250514"])
+        pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
         model_name = pricing["display_name"]
         cache_info = ""
         if self.total_cache_read_tokens > 0:
             cache_info = f" | {self.total_cache_read_tokens:,} cached"
+
         return (
             f"Stats: {model_name} | {self.num_api_calls} API call(s) | "
             f"{self.total_input_tokens:,} in + {self.total_output_tokens:,} out tokens"
@@ -122,7 +118,33 @@ class SessionTracker:
     """Tracks all API usage within a Streamlit session."""
 
     def __init__(self):
-        self.responses: list = []
+        self.responses: List[ResponseUsage] = []
+
+    def log_call(
+        self,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        had_tool_use: bool = False,
+        latency_ms: float = 0.0,
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
+        question: str = "",
+    ) -> None:
+        response_usage = ResponseUsage(question=question)
+        response_usage.calls.append(
+            APICall(
+                timestamp=datetime.now(),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                model=model,
+                had_tool_use=had_tool_use,
+                latency_ms=latency_ms,
+                cache_creation_input_tokens=cache_creation_input_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+            )
+        )
+        self.responses.append(response_usage)
 
     @property
     def total_input_tokens(self) -> int:
@@ -136,20 +158,21 @@ class SessionTracker:
     def total_cost(self) -> float:
         if not self.responses:
             return 0.0
-        # Use the model from the most recent call for pricing
-        last_response = self.responses[-1]
-        if last_response.calls:
-            model = last_response.calls[-1].model
-        else:
-            model = "claude-sonnet-4-20250514"
-        return sum(r.estimated_cost(model) for r in self.responses)
+
+        total = 0.0
+        for response in self.responses:
+            if response.calls:
+                model = response.calls[-1].model
+            else:
+                model = "default"
+            total += response.estimated_cost(model)
+        return total
 
     @property
     def total_api_calls(self) -> int:
         return sum(r.num_api_calls for r in self.responses)
 
     def format_sidebar(self) -> str:
-        """Format summary for the Streamlit sidebar."""
         return (
             f"**Session usage**\n\n"
             f"- Questions asked: {len(self.responses)}\n"
