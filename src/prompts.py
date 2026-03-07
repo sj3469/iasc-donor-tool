@@ -6,11 +6,6 @@ role and behavior, then the knowledge base content is optionally appended.
 The knowledge base is only loaded when the user's question needs it.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
-
 from knowledge import load_knowledge_base
 
 
@@ -49,6 +44,7 @@ When answering questions:
 7. When relevant, use the knowledge base for fundraising context, but prioritize actual donor data.
 8. Format dollar amounts clearly, for example $1,234.56.
 9. Format dates clearly.
+10. If the available data is limited, say so plainly instead of guessing.
 
 Context about IASC's fundraising:
 - IASC is a small nonprofit with a donor base in the hundreds.
@@ -80,30 +76,17 @@ def needs_knowledge_base(user_message: str) -> bool:
     return any(kw in msg_lower for kw in KNOWLEDGE_TRIGGER_KEYWORDS)
 
 
-def build_system_prompt(include_knowledge: bool = False) -> list[dict]:
-    """Build the system prompt as Gemini content blocks."""
+def build_system_prompt(include_knowledge: bool = False) -> str:
+    """Build the system prompt as plain text for Gemini system_instruction."""
     base_content = BASE_SYSTEM_PROMPT + "\n\n" + DB_SCHEMA_SUMMARY
 
     if include_knowledge:
         kb_content = load_knowledge_base()
-        return [
-            {"type": "text", "text": base_content},
-            {
-                "type": "text",
-                "text": kb_content,
-                "cache_control": {"type": "ephemeral"},
-            },
-        ]
+        if kb_content:
+            return base_content + "\n\n" + kb_content
 
     fallback_note = (
         "\n\nNote: A fundraising best-practices knowledge base is available. "
         "Use it when the user asks strategy or best-practice questions."
     )
-
-    return [
-        {
-            "type": "text",
-            "text": base_content + fallback_note,
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
+    return base_content + fallback_note
