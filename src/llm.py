@@ -37,13 +37,32 @@ def _build_prompt_content(
     return "\n".join(parts)
 
 
-def _flatten_system_prompt(raw_prompt: Any) -> str:
-    if isinstance(raw_prompt, list):
-        return " ".join(
-            p.get("text", "") if isinstance(p, dict) else str(p)
-            for p in raw_prompt
-        )
-    return str(raw_prompt)
+def _extract_response_text(response: Any) -> str:
+    try:
+        text = getattr(response, "text", None)
+        if text and str(text).strip():
+            return str(text).strip()
+    except Exception:
+        pass
+
+    texts = []
+    candidates = getattr(response, "candidates", None) or []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for part in parts:
+            part_text = getattr(part, "text", None)
+            if part_text and str(part_text).strip():
+                texts.append(str(part_text).strip())
+
+    if texts:
+        return "\n".join(texts)
+
+    function_calls = getattr(response, "function_calls", None) or []
+    if function_calls:
+        return "I need one more detail before I can continue."
+
+    return "No response text was returned by Gemini."
 
 
 def get_response(
@@ -62,9 +81,7 @@ def get_response(
     client = genai.Client(api_key=api_key)
 
     include_knowledge = needs_knowledge_base(user_message)
-    raw_prompt = build_system_prompt(include_knowledge=include_knowledge)
-    system_instruction_text = _flatten_system_prompt(raw_prompt)
-
+    system_instruction_text = build_system_prompt(include_knowledge=include_knowledge)
     prompt_content = _build_prompt_content(user_message, conversation_history)
 
     tools = [
@@ -97,8 +114,7 @@ def get_response(
 
     input_tokens = getattr(usage, "prompt_token_count", 0) or 0
     output_tokens = getattr(usage, "candidates_token_count", 0) or 0
-
-    response_text = response.text if getattr(response, "text", None) else "No response generated."
+    response_text = _extract_response_text(response)
 
     session_tracker.log_call(
         model=model,
