@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional, Callable
 from google import genai
-from google.genai import types
+from google.genai import types, errors
 
 from prompts import build_system_prompt
 
@@ -16,7 +16,11 @@ def get_response(
     attachment: Optional[Any] = None,
 ) -> tuple[str, Any]:
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is missing")
+
+    client = genai.Client(api_key=api_key)
 
     raw_prompt = build_system_prompt()
     if isinstance(raw_prompt, list):
@@ -26,14 +30,17 @@ def get_response(
     else:
         system_instruction_text = str(raw_prompt)
 
-    response = client.models.generate_content(
-        model=model,
-        contents=user_message,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction_text,
-            temperature=0.2,
-        ),
-    )
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction_text,
+                temperature=0.2,
+            ),
+        )
+    except errors.APIError as e:
+        raise RuntimeError(f"Gemini API error: status={e.code} message={e}") from e
 
     usage = response.usage_metadata
     session_tracker.log_call(
