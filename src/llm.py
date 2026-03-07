@@ -22,9 +22,12 @@ def get_response(
 ) -> tuple[str, Any]:
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    tools = [search_donors, get_donor_detail, get_summary_statistics,
-             get_geographic_distribution, get_lapsed_donors,
-             get_prospects_by_potential, plan_fundraising_trip]
+    tools = [
+    search_donors,
+    get_donor_detail,
+    get_summary_statistics,
+    plan_fundraising_trip]
+
 
     # Clean the system prompt to avoid validation errors
     raw_prompt = build_system_prompt()
