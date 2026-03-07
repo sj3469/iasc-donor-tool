@@ -1,34 +1,23 @@
 import os
 import re
 from types import SimpleNamespace
-from typing import List, Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 try:
     from google import genai
 except Exception:
     genai = None
 
+from prompts import build_system_prompt, needs_knowledge_base
 from queries import (
-    search_donors,
     get_donor_detail,
-    get_summary_statistics,
     get_geographic_distribution,
     get_lapsed_donors,
     get_prospects_by_potential,
+    get_summary_statistics,
     plan_fundraising_trip,
+    search_donors,
 )
-
-try:
-    from prompts import build_system_prompt, needs_knowledge_base
-except Exception:
-    def build_system_prompt(include_knowledge: bool = False) -> str:
-        return (
-            "You are a donor analytics assistant for IASC. "
-            "Use available donor data when possible and avoid inventing facts."
-        )
-
-    def needs_knowledge_base(user_message: str) -> bool:
-        return False
 
 
 STATE_NAME_TO_ABBR = {
@@ -47,7 +36,7 @@ STATE_NAME_TO_ABBR = {
     "ohio": "OH",
     "georgia": "GA",
     "north carolina": "NC",
-    "washington": "WA",
+    "washington state": "WA",
     "colorado": "CO",
     "minnesota": "MN",
     "missouri": "MO",
@@ -56,7 +45,14 @@ STATE_NAME_TO_ABBR = {
     "new jersey": "NJ",
 }
 
-VALID_STATE_ABBRS = set(STATE_NAME_TO_ABBR.values())
+VALID_STATE_ABBRS = {
+    "VA", "NY", "DC", "MD", "MA", "IL", "CA", "TX", "FL", "PA",
+    "OH", "GA", "NC", "WA", "CO", "MN", "MO", "AZ", "TN", "NJ"
+}
+
+
+def _zero_usage() -> Any:
+    return SimpleNamespace(prompt_token_count=0, candidates_token_count=0)
 
 
 def _safe_log_usage(session_tracker: Any, model: str, usage: Any, question: str = "") -> None:
@@ -79,10 +75,6 @@ def _safe_log_usage(session_tracker: Any, model: str, usage: Any, question: str 
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
-
-
-def _zero_usage() -> Any:
-    return SimpleNamespace(prompt_token_count=0, candidates_token_count=0)
 
 
 def _fmt_currency(value: Any) -> str:
@@ -121,34 +113,35 @@ def _extract_contact_id(text: str) -> Optional[str]:
 
 
 def _extract_state(text: str) -> Optional[str]:
+    lower_text = text.lower()
     upper_text = text.upper()
+
+    for name, abbr in sorted(STATE_NAME_TO_ABBR.items(), key=lambda x: -len(x[0])):
+        if name in lower_text:
+            return abbr
 
     for abbr in VALID_STATE_ABBRS:
         if re.search(rf"\b{abbr}\b", upper_text):
             return abbr
 
-    lower_text = text.lower()
-    for name, abbr in sorted(STATE_NAME_TO_ABBR.items(), key=lambda x: -len(x[0])):
-        if name in lower_text:
-            return abbr
-
     return None
 
 
-def _extract_city_phrase(text: str) -> Optional[str]:
+def _extract_city(text: str) -> Optional[str]:
     patterns = [
         r"\bin\s+([A-Za-z.\- ]+?),\s*[A-Z]{2}\b",
         r"\bin\s+([A-Za-z.\- ]+)\b",
     ]
+    blocked = {
+        "zip", "state", "va", "ny", "dc", "md", "ma", "il", "ca", "tx", "fl",
+        "pa", "oh", "ga", "nc", "wa", "co", "mn", "mo", "az", "tn", "nj"
+    }
+
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             city = match.group(1).strip()
-            if city and city.lower() not in {
-                "zip", "state", "va", "ny", "dc", "md", "ma", "il", "ca",
-                "tx", "fl", "pa", "oh", "ga", "nc", "wa", "co", "mn", "mo",
-                "az", "tn", "nj"
-            }:
+            if city and city.lower() not in blocked:
                 return city
     return None
 
@@ -157,8 +150,7 @@ def _person_label(row: dict) -> str:
     first_name = _pick(row, "first_name", default="")
     last_name = _pick(row, "last_name", default="")
     full_name = f"{first_name} {last_name}".strip()
-    contact_id = _pick(row, "contact_id", default="Unknown ID")
-    return full_name if full_name else contact_id
+    return full_name or _pick(row, "contact_id", default="Unknown donor")
 
 
 def _location_label(row: dict) -> str:
@@ -170,10 +162,10 @@ def _location_label(row: dict) -> str:
         return f"{city}, {state}"
     if state and zip_code:
         return f"{state} {zip_code}"
-    if zip_code:
-        return f"ZIP {zip_code}"
     if state:
         return state
+    if zip_code:
+        return f"ZIP {zip_code}"
     return "N/A"
 
 
@@ -184,22 +176,13 @@ def _format_donor_list(title: str, result: dict, max_rows: int = 10) -> str:
 
     lines = [title]
     for row in rows[:max_rows]:
-        person = _person_label(row)
-        contact_id = _pick(row, "contact_id", default="Unknown ID")
-        location = _location_label(row)
-        total_gifts = _pick(row, "total_gifts", default=None)
-        last_gift_date = _pick(row, "last_gift_date", default="N/A")
-        donor_status = _pick(row, "donor_status", default="N/A")
-        wealth_score = _pick(row, "wealth_score", default="N/A")
-
         lines.append(
-            f"{person} ({contact_id}) | {location} | "
-            f"Total gifts {_fmt_currency(total_gifts)} | "
-            f"Last gift {last_gift_date} | "
-            f"Status {donor_status} | "
-            f"Wealth {wealth_score}"
+            f"- {_person_label(row)} | {_location_label(row)} | "
+            f"Total gifts {_fmt_currency(_pick(row, 'total_gifts'))} | "
+            f"Last gift {_pick(row, 'last_gift_date', default='N/A')} | "
+            f"Status {_pick(row, 'donor_status', default='N/A')} | "
+            f"Wealth {_pick(row, 'wealth_score', default='N/A')}"
         )
-
     return "\n".join(lines)
 
 
@@ -209,49 +192,25 @@ def _format_donor_detail(result: dict) -> str:
         return "No donor found."
 
     row = rows[0]
-
-    person = _person_label(row)
-    contact_id = _pick(row, "contact_id", default="Unknown ID")
-    email = _pick(row, "email", default="N/A")
-    city = _pick(row, "city", default="N/A")
-    state = _pick(row, "state", default="N/A")
-    zip_code = _pick(row, "zip_code", default="N/A")
-    donor_status = _pick(row, "donor_status", default="N/A")
-    created = _pick(row, "contact_created_date", default="N/A")
-    first_gift_date = _pick(row, "first_gift_date", default="N/A")
-    last_gift_date = _pick(row, "last_gift_date", default="N/A")
-    total_gifts = _pick(row, "total_gifts", default=None)
-    total_number_of_gifts = _pick(row, "total_number_of_gifts", default="N/A")
-    average_gift = _pick(row, "average_gift", default=None)
-    giving_vehicle = _pick(row, "giving_vehicle", default="N/A")
-    subscription_type = _pick(row, "subscription_type", default="N/A")
-    subscription_status = _pick(row, "subscription_status", default="N/A")
-    email_open_rate = _pick(row, "email_open_rate", default=None)
-    last_email_click_date = _pick(row, "last_email_click_date", default="N/A")
-    event_attendance_count = _pick(row, "event_attendance_count", default="N/A")
-    wealth_score = _pick(row, "wealth_score", default="N/A")
-    notes = _pick(row, "notes", default="N/A")
-
     return "\n".join([
-        f"Donor detail for {person}",
-        f"Contact ID: {contact_id}",
-        f"Email: {email}",
-        f"Location: {city}, {state} {zip_code}",
-        f"Donor status: {donor_status}",
-        f"Contact created date: {created}",
-        f"First gift date: {first_gift_date}",
-        f"Last gift date: {last_gift_date}",
-        f"Total gifts: {_fmt_currency(total_gifts)}",
-        f"Total number of gifts: {total_number_of_gifts}",
-        f"Average gift: {_fmt_currency(average_gift)}",
-        f"Giving vehicle: {giving_vehicle}",
-        f"Subscription type: {subscription_type}",
-        f"Subscription status: {subscription_status}",
-        f"Email open rate: {_fmt_pct(email_open_rate)}",
-        f"Last email click date: {last_email_click_date}",
-        f"Event attendance count: {event_attendance_count}",
-        f"Wealth score: {wealth_score}",
-        f"Notes: {notes}",
+        f"Donor detail for {_person_label(row)}",
+        f"Contact ID: {_pick(row, 'contact_id', default='N/A')}",
+        f"Email: {_pick(row, 'email', default='N/A')}",
+        f"Location: {_pick(row, 'city', default='N/A')}, {_pick(row, 'state', default='N/A')} {_pick(row, 'zip_code', default='')}".strip(),
+        f"Donor status: {_pick(row, 'donor_status', default='N/A')}",
+        f"Contact created: {_pick(row, 'contact_created_date', default='N/A')}",
+        f"First gift date: {_pick(row, 'first_gift_date', default='N/A')}",
+        f"Last gift date: {_pick(row, 'last_gift_date', default='N/A')}",
+        f"Total gifts: {_fmt_currency(_pick(row, 'total_gifts'))}",
+        f"Number of gifts: {_pick(row, 'total_number_of_gifts', default='N/A')}",
+        f"Average gift: {_fmt_currency(_pick(row, 'average_gift'))}",
+        f"Giving vehicle: {_pick(row, 'giving_vehicle', default='N/A')}",
+        f"Subscription: {_pick(row, 'subscription_type', default='N/A')} / {_pick(row, 'subscription_status', default='N/A')}",
+        f"Email open rate: {_fmt_pct(_pick(row, 'email_open_rate'))}",
+        f"Last email click: {_pick(row, 'last_email_click_date', default='N/A')}",
+        f"Event attendance count: {_pick(row, 'event_attendance_count', default='N/A')}",
+        f"Wealth score: {_pick(row, 'wealth_score', default='N/A')}",
+        f"Notes: {_pick(row, 'notes', default='N/A')}",
     ])
 
 
@@ -261,24 +220,13 @@ def _format_summary(result: dict) -> str:
         return "No summary statistics available."
 
     row = rows[0]
-    donor_count = row.get("donor_count", 0)
-    total_giving = row.get("total_giving", 0)
-    avg_total_giving = row.get("avg_total_giving", 0)
-    avg_gift = row.get("avg_gift", 0)
-    avg_wealth_score = row.get("avg_wealth_score", 0)
-
-    if isinstance(avg_wealth_score, (int, float)):
-        avg_wealth_text = f"{avg_wealth_score:.2f}"
-    else:
-        avg_wealth_text = str(avg_wealth_score)
-
     return "\n".join([
         "Summary statistics",
-        f"Donor count: {donor_count}",
-        f"Total giving: {_fmt_currency(total_giving)}",
-        f"Average total giving per donor: {_fmt_currency(avg_total_giving)}",
-        f"Average gift: {_fmt_currency(avg_gift)}",
-        f"Average wealth score: {avg_wealth_text}",
+        f"- Donor count: {row.get('donor_count', 0)}",
+        f"- Total giving: {_fmt_currency(row.get('total_giving', 0))}",
+        f"- Average total giving per donor: {_fmt_currency(row.get('avg_total_giving', 0))}",
+        f"- Average gift: {_fmt_currency(row.get('avg_gift', 0))}",
+        f"- Average wealth score: {row.get('avg_wealth_score', 0):.2f}" if isinstance(row.get('avg_wealth_score', 0), (int, float)) else f"- Average wealth score: {row.get('avg_wealth_score', 'N/A')}",
     ])
 
 
@@ -289,12 +237,9 @@ def _format_grouped_summary(title: str, result: dict) -> str:
 
     lines = [title]
     for row in rows:
-        group_value = row.get("group_value")
-        donor_count = row.get("donor_count", 0)
-        total_giving = row.get("total_giving", 0)
-        label = group_value if group_value not in (None, "") else "Unknown"
+        label = row.get("group_value") or "Unknown"
         lines.append(
-            f"{label} | Donors {donor_count} | Total giving {_fmt_currency(total_giving)}"
+            f"- {label} | Donors {row.get('donor_count', 0)} | Total giving {_fmt_currency(row.get('total_giving', 0))}"
         )
     return "\n".join(lines)
 
@@ -306,20 +251,17 @@ def _format_geo_distribution(result: dict, max_rows: int = 10) -> str:
 
     lines = ["Top geographic segments"]
     for row in rows[:max_rows]:
-        state = row.get("state", "N/A")
-        city = row.get("city", "N/A")
-        zip_code = row.get("zip_code", "N/A")
-        donor_count = row.get("donor_count", 0)
-        total_giving = row.get("total_giving", 0)
         lines.append(
-            f"{city}, {state} {zip_code} | Donors {donor_count} | Total giving {_fmt_currency(total_giving)}"
+            f"- {row.get('city', 'N/A')}, {row.get('state', 'N/A')} {row.get('zip_code', 'N/A')} | "
+            f"Donors {row.get('donor_count', 0)} | Total giving {_fmt_currency(row.get('total_giving', 0))}"
         )
     return "\n".join(lines)
 
 
 def _help_text() -> str:
     return "\n".join([
-        "I can help with donor analytics queries.",
+        "I can help with donor analytics questions.",
+        "",
         "Try one of these:",
         "- Show top donors overall",
         "- Show top donors in VA",
@@ -327,9 +269,7 @@ def _help_text() -> str:
         "- Show top donors in ZIP 10027",
         "- Show lapsed donors",
         "- Show top prospects by wealth score",
-        "- Show donor 003XX00000ABCDEFGH",
         "- Show summary",
-        "- Show summary by donor status",
         "- Show summary by state",
         "- Show geographic distribution",
         "- Plan a fundraising trip in DC",
@@ -341,7 +281,7 @@ def _handle_direct_query(user_message: str) -> Optional[str]:
     zip_code = _extract_zip(user_message)
     contact_id = _extract_contact_id(user_message)
     state = _extract_state(user_message)
-    city = _extract_city_phrase(user_message)
+    city = _extract_city(user_message)
 
     if contact_id:
         return _format_donor_detail(get_donor_detail(contact_id))
@@ -368,12 +308,6 @@ def _handle_direct_query(user_message: str) -> Optional[str]:
         return _format_donor_list(
             f"Top donors in {city}",
             search_donors(city=city, sort_by="total_gifts", sort_order="desc", limit=10),
-        )
-
-    if ("top donors" in text or "largest donors" in text) and "overall" in text:
-        return _format_donor_list(
-            "Top donors overall",
-            search_donors(sort_by="total_gifts", sort_order="desc", limit=10),
         )
 
     if "lapsed" in text and state:
@@ -421,13 +355,13 @@ def _handle_direct_query(user_message: str) -> Optional[str]:
             get_summary_statistics(group_by="state"),
         )
 
-    if "geographic" in text or "zip distribution" in text or "postal code distribution" in text:
+    if "geographic" in text or "distribution" in text:
         return _format_geo_distribution(get_geographic_distribution(limit=10))
 
     if text in {"summary", "show summary", "overall summary"}:
         return _format_summary(get_summary_statistics())
 
-    if "top donors" in text:
+    if "top donors" in text or "largest donors" in text:
         return _format_donor_list(
             "Top donors overall",
             search_donors(sort_by="total_gifts", sort_order="desc", limit=10),
@@ -457,21 +391,49 @@ def get_response(
         _safe_log_usage(session_tracker, model, usage, question=user_message)
         return _help_text(), usage
 
+    attachment_note = ""
+    if attachment:
+        try:
+            names = [f.name for f in attachment if getattr(f, "name", None)]
+            if names:
+                attachment_note = "\n\nUploaded files:\n- " + "\n- ".join(names)
+        except Exception:
+            attachment_note = ""
+
+    history_text = ""
+    if conversation_history:
+        trimmed = conversation_history[-6:]
+        lines = []
+        for msg in trimmed:
+            role = msg.get("role", "user").capitalize()
+            content = msg.get("content", "")
+            lines.append(f"{role}: {content}")
+        history_text = "\n\nRecent conversation:\n" + "\n".join(lines)
+
+    include_knowledge = needs_knowledge_base(user_message)
+    system_prompt = build_system_prompt(include_knowledge=include_knowledge)
+
+    final_prompt = (
+        system_prompt
+        + history_text
+        + attachment_note
+        + "\n\nUser request:\n"
+        + user_message
+    )
+
     try:
         client = genai.Client(api_key=api_key)
-        include_knowledge = needs_knowledge_base(user_message)
-        system_instruction_text = str(build_system_prompt(include_knowledge=include_knowledge))
-
         response = client.models.generate_content(
             model=model,
-            contents=[system_instruction_text, user_message],
+            contents=final_prompt,
         )
 
         usage = getattr(response, "usage_metadata", None) or _zero_usage()
-        _safe_log_usage(session_tracker, model, usage, question=user_message)
-
         text = getattr(response, "text", None) or _help_text()
+
+        _safe_log_usage(session_tracker, model, usage, question=user_message)
         return text, usage
+
     except Exception:
         usage = _zero_usage()
         _safe_log_usage(session_tracker, model, usage, question=user_message)
