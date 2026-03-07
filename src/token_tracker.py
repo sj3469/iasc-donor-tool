@@ -1,32 +1,30 @@
 """
 Token usage tracker for the IASC donor analytics tool.
-
-Tracks per-response and per-session token usage and estimated costs,
-including prompt caching savings. Designed to be displayed inline with
-each response and in the Streamlit sidebar.
+Tracks per-response and per-session token usage and estimated costs.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
-# Placeholder pricing table.
-# Update these if you want real in-app cost estimates.
 MODEL_PRICING = {
     "gemini-2.5-flash": {
-        "input_per_mtok": 0.0,
-        "output_per_mtok": 0.0,
+        "input_per_mtok": 0.30,
+        "output_per_mtok": 2.50,
+        "cache_per_mtok": 0.03,
         "display_name": "Gemini 2.5 Flash",
     },
     "gemini-2.5-pro": {
-        "input_per_mtok": 0.0,
-        "output_per_mtok": 0.0,
+        "input_per_mtok": 1.25,
+        "output_per_mtok": 10.00,
+        "cache_per_mtok": 0.125,
         "display_name": "Gemini 2.5 Pro",
     },
     "default": {
         "input_per_mtok": 0.0,
         "output_per_mtok": 0.0,
+        "cache_per_mtok": 0.0,
         "display_name": "Unknown Model",
     },
 }
@@ -34,7 +32,6 @@ MODEL_PRICING = {
 
 @dataclass
 class APICall:
-    """A single API call within a response."""
     timestamp: datetime
     input_tokens: int
     output_tokens: int
@@ -47,7 +44,6 @@ class APICall:
 
 @dataclass
 class ResponseUsage:
-    """Aggregated usage for one user question."""
     question: str
     calls: List[APICall] = field(default_factory=list)
 
@@ -79,46 +75,45 @@ class ResponseUsage:
     def total_cache_creation_tokens(self) -> int:
         return sum(c.cache_creation_input_tokens for c in self.calls)
 
-    def estimated_cost(self, model: str) -> float:
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
-        base_rate = pricing["input_per_mtok"]
-        output_rate = pricing["output_per_mtok"]
-
+    def estimated_cost(self, model: Optional[str] = None) -> float:
         total_cost = 0.0
+
         for call in self.calls:
-            regular_input = max(
-                0,
-                call.input_tokens
-                - call.cache_creation_input_tokens
-                - call.cache_read_input_tokens,
-            )
-            total_cost += (regular_input / 1_000_000) * base_rate
-            total_cost += (call.cache_creation_input_tokens / 1_000_000) * base_rate * 1.25
-            total_cost += (call.cache_read_input_tokens / 1_000_000) * base_rate * 0.1
+            model_key = model or call.model
+            pricing = MODEL_PRICING.get(model_key, MODEL_PRICING["default"])
+
+            input_rate = pricing["input_per_mtok"]
+            output_rate = pricing["output_per_mtok"]
+            cache_rate = pricing["cache_per_mtok"]
+
+            cache_tokens = (call.cache_creation_input_tokens or 0) + (call.cache_read_input_tokens or 0)
+            regular_input = max(0, call.input_tokens - cache_tokens)
+
+            total_cost += (regular_input / 1_000_000) * input_rate
+            total_cost += (cache_tokens / 1_000_000) * cache_rate
             total_cost += (call.output_tokens / 1_000_000) * output_rate
 
         return total_cost
 
-    def format_inline(self, model: str) -> str:
-        cost = self.estimated_cost(model)
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
+    def format_inline(self, model: Optional[str] = None) -> str:
+        model_key = model or (self.calls[-1].model if self.calls else "default")
+        pricing = MODEL_PRICING.get(model_key, MODEL_PRICING["default"])
         model_name = pricing["display_name"]
+        cost = self.estimated_cost(model_key)
 
         cache_info = ""
-        if self.total_cache_read_tokens > 0:
-            cache_info = f" | {self.total_cache_read_tokens:,} cached"
+        if self.total_cache_read_tokens > 0 or self.total_cache_creation_tokens > 0:
+            total_cached = self.total_cache_read_tokens + self.total_cache_creation_tokens
+            cache_info = f" | {total_cached:,} cached"
 
         return (
             f"Stats: {model_name} | {self.num_api_calls} API call(s) | "
             f"{self.total_input_tokens:,} in + {self.total_output_tokens:,} out tokens"
-            f"{cache_info} | "
-            f"${cost:.4f} | {self.total_latency_ms:.0f}ms"
+            f"{cache_info} | ${cost:.4f} | {self.total_latency_ms:.0f}ms"
         )
 
 
 class SessionTracker:
-    """Tracks all API usage within a Streamlit session."""
-
     def __init__(self):
         self.responses: List[ResponseUsage] = []
 
@@ -158,14 +153,7 @@ class SessionTracker:
 
     @property
     def total_cost(self) -> float:
-        if not self.responses:
-            return 0.0
-
-        total = 0.0
-        for response in self.responses:
-            model = response.calls[-1].model if response.calls else "default"
-            total += response.estimated_cost(model)
-        return total
+        return sum(r.estimated_cost() for r in self.responses)
 
     @property
     def total_api_calls(self) -> int:
