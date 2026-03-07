@@ -48,12 +48,12 @@ with st.sidebar:
     st.markdown("### 🎯 Quick Filters")
     donor_status_filter = st.selectbox(
         "Default donor status view",
-        ["All", "active", "lapsed", "prospect", "new_donor"],
+        ["All", "active", "lapsed", "prospect"],
         index=0,
     )
     sort_choice = st.selectbox(
         "Default ranking",
-        ["total_gifts", "last_name", "wealth_score"],
+        ["total_gifts", "average_gift", "wealth_score", "last_gift_date"],
         index=0,
     )
 
@@ -64,11 +64,12 @@ with st.sidebar:
     st.markdown("### ❓ Frequently Asked Questions")
     with st.expander("What can I ask here?"):
         st.markdown(
-            "- Show top donors in a state\n"
+            "- Show top donors overall\n"
+            "- Show top donors in ZIP 10027\n"
             "- Find lapsed donors worth re-engaging\n"
             "- Identify high-potential prospects\n"
             "- Summarize geographic donor distribution\n"
-            "- Suggest outreach candidates"
+            "- Show donor C000015"
         )
 
     with st.expander("Why are some answers short?"):
@@ -94,7 +95,10 @@ st.subheader(APP_SUBTITLE)
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if message["role"] == "assistant":
+            st.text(message["content"])
+        else:
+            st.markdown(message["content"])
 
 
 if prompt := st.chat_input("Ask about your donor community..."):
@@ -116,7 +120,7 @@ if prompt := st.chat_input("Ask about your donor community..."):
                 )
                 status.update(label="Analysis Complete!", state="complete", expanded=False)
 
-            response_placeholder.markdown(response)
+            response_placeholder.text(response)
 
             try:
                 st.caption(
