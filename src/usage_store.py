@@ -2,7 +2,7 @@
 Persistent token usage storage.
 
 Logs every API call to a local SQLite database so usage can be queried
-across sessions. The DB file lives alongside the donor database in data/.
+across sessions.
 
 This is a lightweight append-only log; it does not store conversation content,
 only token counts, timestamps, model names, and cost estimates.
@@ -13,13 +13,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-DB_PATH = Path(__file__).parent.parent / "data" / "usage.db"
+DB_PATH = Path(__file__).parent / "usage.db"
 
 
 def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS api_calls (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
@@ -33,7 +34,8 @@ def _get_connection() -> sqlite3.Connection:
             question TEXT,
             session_id TEXT
         )
-    """)
+        """
+    )
     conn.commit()
     return conn
 
@@ -81,14 +83,7 @@ def get_usage_summary(
     since: Optional[str] = None,
     model: Optional[str] = None,
 ) -> dict:
-    """Query cumulative usage statistics.
-
-    Args:
-        since: ISO date string (YYYY-MM-DD). If provided, only count calls after this date.
-        model: Filter to a specific model name.
-
-    Returns a dict with aggregate stats suitable for returning as a tool result.
-    """
+    """Query cumulative usage statistics."""
     conn = _get_connection()
 
     conditions = []
@@ -124,15 +119,14 @@ def get_usage_summary(
 
     result = dict(row)
 
-    # Add per-model breakdown
     model_rows = conn.execute(
         f"""
         SELECT
             model,
             COUNT(*) as api_calls,
-            SUM(input_tokens) as input_tokens,
-            SUM(output_tokens) as output_tokens,
-            SUM(cache_read_input_tokens) as cache_read_tokens
+            COALESCE(SUM(input_tokens), 0) as input_tokens,
+            COALESCE(SUM(output_tokens), 0) as output_tokens,
+            COALESCE(SUM(cache_read_input_tokens), 0) as cache_read_tokens
         FROM api_calls
         {where}
         GROUP BY model
@@ -143,25 +137,24 @@ def get_usage_summary(
 
     result["by_model"] = [dict(r) for r in model_rows]
 
-    # Estimate cost (using the pricing from token_tracker)
     from token_tracker import MODEL_PRICING
 
     total_cost = 0.0
     for mr in result["by_model"]:
-        pricing = MODEL_PRICING.get(mr["model"], MODEL_PRICING.get("claude-sonnet-4-20250514", {}))
-        base_rate = pricing.get("input_per_mtok", 3.0)
-        output_rate = pricing.get("output_per_mtok", 15.0)
+        pricing = MODEL_PRICING.get(mr["model"], MODEL_PRICING.get("default", {}))
+        base_rate = pricing.get("input_per_mtok", 0.0)
+        output_rate = pricing.get("output_per_mtok", 0.0)
 
         cache_read = mr.get("cache_read_tokens", 0) or 0
         regular_input = (mr.get("input_tokens", 0) or 0) - cache_read
+
         total_cost += (regular_input / 1_000_000) * base_rate
         total_cost += (cache_read / 1_000_000) * base_rate * 0.1
         total_cost += ((mr.get("output_tokens", 0) or 0) / 1_000_000) * output_rate
 
     result["estimated_total_cost_usd"] = round(total_cost, 4)
     result["note"] = (
-        "These are estimates based on list pricing. For exact billing, "
-        "see https://console.anthropic.com/ or https://platform.claude.com/usage"
+        "These are rough in-app estimates based on the local pricing table."
     )
 
     conn.close()
