@@ -11,18 +11,18 @@ from datetime import datetime
 from typing import List
 
 
-# Pricing placeholders.
-# These are not accurate for Gemini, but they prevent crashes and allow display.
+# Placeholder pricing table.
+# Update these if you want real in-app cost estimates.
 MODEL_PRICING = {
-    "gemini-2.0-flash": {
+    "gemini-2.5-flash": {
         "input_per_mtok": 0.0,
         "output_per_mtok": 0.0,
-        "display_name": "Gemini 2.0 Flash",
+        "display_name": "Gemini 2.5 Flash",
     },
-    "gemini-1.5-pro": {
+    "gemini-2.5-pro": {
         "input_per_mtok": 0.0,
         "output_per_mtok": 0.0,
-        "display_name": "Gemini 1.5 Pro",
+        "display_name": "Gemini 2.5 Pro",
     },
     "default": {
         "input_per_mtok": 0.0,
@@ -86,10 +86,11 @@ class ResponseUsage:
 
         total_cost = 0.0
         for call in self.calls:
-            regular_input = (
+            regular_input = max(
+                0,
                 call.input_tokens
                 - call.cache_creation_input_tokens
-                - call.cache_read_input_tokens
+                - call.cache_read_input_tokens,
             )
             total_cost += (regular_input / 1_000_000) * base_rate
             total_cost += (call.cache_creation_input_tokens / 1_000_000) * base_rate * 1.25
@@ -102,6 +103,7 @@ class ResponseUsage:
         cost = self.estimated_cost(model)
         pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
         model_name = pricing["display_name"]
+
         cache_info = ""
         if self.total_cache_read_tokens > 0:
             cache_info = f" | {self.total_cache_read_tokens:,} cached"
@@ -161,10 +163,7 @@ class SessionTracker:
 
         total = 0.0
         for response in self.responses:
-            if response.calls:
-                model = response.calls[-1].model
-            else:
-                model = "default"
+            model = response.calls[-1].model if response.calls else "default"
             total += response.estimated_cost(model)
         return total
 
