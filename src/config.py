@@ -18,8 +18,12 @@ DB_PATH = BASE_DIR / "donors.db"
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 AVAILABLE_MODELS = {
-    "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
+    "gemini-2.5-flash": "Gemini 2.5 Flash (Fastest)",
+    "gemini-2.5-pro": "Gemini 2.5 Pro (Most Capable)",
 }
+
+DEFAULT_MODEL = "gemini-2.5-flash"
+
 
 DEFAULT_MODEL = "gemini-2.0-flash"
 
