@@ -19,8 +19,10 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 AVAILABLE_MODELS = {
     "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
-    "gemini-1.5-pro": "Gemini 1.5 Pro (Most Capable)",
 }
+
+DEFAULT_MODEL = "gemini-2.0-flash"
+
 
 DEFAULT_MODEL = "gemini-2.0-flash"
 
