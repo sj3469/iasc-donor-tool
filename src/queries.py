@@ -73,6 +73,7 @@ def search_donors(
 
 
 def get_donor_detail(contact_id: str) -> dict:
+    """Return one donor record by contact_id."""
     with get_db_connection() as conn:
         row = conn.execute(
             "SELECT * FROM contacts WHERE contact_id = ?",
@@ -82,18 +83,25 @@ def get_donor_detail(contact_id: str) -> dict:
     if row is None:
         return {"results": [], "count": 0, "summary": "No donor found."}
 
-    result = dict(row)
-    return {"results": [result], "count": 1, "summary": "Found donor detail."}
+    return {
+        "results": [dict(row)],
+        "count": 1,
+        "summary": "Found donor detail."
+    }
 
 
-def get_summary_statistics(group_by: str = None) -> dict:
+def get_summary_statistics(group_by: Optional[str] = None) -> dict:
+    """Return overall or grouped donor summary statistics."""
+    allowed_group_by = {"state", "donor_status", "giving_vehicle", "subscription_status"}
+
     with get_db_connection() as conn:
-        if group_by in {"state", "donor_status", "giving_vehicle", "subscription_status"}:
+        if group_by in allowed_group_by:
             rows = conn.execute(
                 f"""
-                SELECT {group_by} AS group_value,
-                       COUNT(*) AS donor_count,
-                       COALESCE(SUM(total_gifts), 0) AS total_giving
+                SELECT
+                    {group_by} AS group_value,
+                    COUNT(*) AS donor_count,
+                    COALESCE(SUM(total_gifts), 0) AS total_giving
                 FROM contacts
                 GROUP BY {group_by}
                 ORDER BY donor_count DESC
@@ -112,25 +120,44 @@ def get_summary_statistics(group_by: str = None) -> dict:
             ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": "Summary statistics generated."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": "Summary statistics generated."
+    }
 
 
-def get_geographic_distribution() -> dict:
+def get_geographic_distribution(limit: int = 50) -> dict:
+    """Return donor distribution by state."""
+    limit = max(1, min(int(limit), 100))
+
     with get_db_connection() as conn:
         rows = conn.execute(
             """
-            SELECT state, COUNT(*) AS donor_count, COALESCE(SUM(total_gifts), 0) AS total_giving
+            SELECT
+                state,
+                COUNT(*) AS donor_count,
+                COALESCE(SUM(total_gifts), 0) AS total_giving
             FROM contacts
             GROUP BY state
             ORDER BY donor_count DESC, total_giving DESC
-            """
+            LIMIT ?
+            """,
+            (limit,),
         ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": "Geographic distribution generated."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": "Geographic distribution generated."
+    }
 
 
-def get_lapsed_donors() -> dict:
+def get_lapsed_donors(limit: int = 50) -> dict:
+    """Return top lapsed donors."""
+    limit = max(1, min(int(limit), 100))
+
     with get_db_connection() as conn:
         rows = conn.execute(
             """
@@ -138,15 +165,23 @@ def get_lapsed_donors() -> dict:
             FROM contacts
             WHERE donor_status = 'lapsed'
             ORDER BY total_gifts DESC
-            LIMIT 50
-            """
+            LIMIT ?
+            """,
+            (limit,),
         ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": f"Found {len(results)} lapsed donors."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": f"Found {len(results)} lapsed donors."
+    }
 
 
-def get_prospects_by_potential() -> dict:
+def get_prospects_by_potential(limit: int = 50) -> dict:
+    """Return top prospects ranked by potential."""
+    limit = max(1, min(int(limit), 100))
+
     with get_db_connection() as conn:
         rows = conn.execute(
             """
@@ -154,15 +189,23 @@ def get_prospects_by_potential() -> dict:
             FROM contacts
             WHERE donor_status = 'prospect'
             ORDER BY wealth_score DESC, event_attendance_count DESC
-            LIMIT 50
-            """
+            LIMIT ?
+            """,
+            (limit,),
         ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": f"Found {len(results)} prospects."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": f"Found {len(results)} prospects."
+    }
 
 
-def plan_fundraising_trip(target_state: str) -> dict:
+def plan_fundraising_trip(target_state: str, limit: int = 20) -> dict:
+    """Return top donors in a target state for visit planning."""
+    limit = max(1, min(int(limit), 100))
+
     with get_db_connection() as conn:
         rows = conn.execute(
             """
@@ -170,9 +213,9 @@ def plan_fundraising_trip(target_state: str) -> dict:
             FROM contacts
             WHERE state = ?
             ORDER BY total_gifts DESC, wealth_score DESC
-            LIMIT 20
+            LIMIT ?
             """,
-            (target_state.upper(),),
+            (target_state.upper(), limit),
         ).fetchall()
 
     results = _rows_to_dicts(rows)
