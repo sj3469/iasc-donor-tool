@@ -39,32 +39,76 @@ if not DB_PATH.exists():
         except Exception as e:
             st.error(f"Failed to generate database: {e}")
 
+# --- HELPER: CSV PARSER ---
+def convert_to_csv(text):
+    """Extracts markdown tables from the AI response and converts them to CSV."""
+    lines = text.strip().split('\n')
+    csv_lines = []
+    for line in lines:
+        line = line.strip()
+        # Look for markdown table rows starting and ending with a pipe |
+        if line.startswith('|') and line.endswith('|'):
+            line = line[1:-1]
+            # Skip the markdown separator row (e.g. |---|---|)
+            if set(line.replace('|', '').replace('-', '').replace(' ', '')) == set():
+                continue
+            # Clean up columns and join with commas
+            row = [col.strip().replace('"', '""') for col in line.split('|')]
+            csv_row = ','.join(f'"{col}"' if ',' in col else col for col in row)
+            csv_lines.append(csv_row)
+    
+    if csv_lines:
+        return "\n".join(csv_lines).encode('utf-8')
+    return text.encode('utf-8')
+
 # --- CSS INJECTION ---
 def inject_css() -> None:
     st.markdown(
         """
         <style>
-        :root { --bg: #0b1020; --panel: #12182b; --panel-2: #161d33; --border: #27314a; --text: #e8ecf7; --muted: #9aa4bf; }
-        .stApp { background: var(--bg); color: var(--text); }
-        [data-testid="stSidebar"] { background: #0f1527; border-right: 1px solid var(--border); }
-        [data-testid="stSidebar"] * { color: var(--text); }
-        h1, h2, h3, h4, p, span, label, div { color: var(--text); }
-        div[data-testid="stTextInput"] input, textarea, input, div[data-baseweb="select"] {
-            background-color: var(--panel); color: var(--text); border: 1px solid var(--border);
+        /* Define colors: Light main area, Dark sidebar */
+        :root { 
+            --main-bg: #f8f9fa; 
+            --main-text: #111827; 
+            --sidebar-bg: #0f1527; 
+            --border: #e5e7eb; 
+            --sidebar-border: #27314a;
+            --text-light: #e8ecf7; 
+            --accent: #7c8cff;
+            --off-white: #fdfdfd;
         }
-        .app-subtitle { color: var(--muted); margin-top: -0.25rem; margin-bottom: 1rem; font-size: 0.98rem; }
         
-        /* Custom FAQ Button Styling */
+        /* Light Theme for Main App */
+        .stApp { background: var(--main-bg); color: var(--main-text); }
+        h1, h2, h3, h4, p, span, label, div { color: var(--main-text); }
+        .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 1rem; font-size: 0.98rem; }
+        
+        /* Preserve Dark Theme for Sidebar */
+        [data-testid="stSidebar"] { background: var(--sidebar-bg); border-right: 1px solid var(--sidebar-border); }
+        [data-testid="stSidebar"] * { color: var(--text-light) !important; }
+        
+        /* Text Input Styling & Off-White Focus Outline */
+        div[data-testid="stChatInputContainer"] {
+            border: 1px solid #d1d5db !important;
+            background-color: white !important;
+        }
+        div[data-testid="stChatInputContainer"]:focus-within {
+            outline: 2px solid var(--off-white) !important;
+            border-color: var(--off-white) !important;
+            box-shadow: 0 0 8px rgba(200, 200, 200, 0.3) !important;
+        }
+        
+        /* FAQ Button Styling */
         div[data-testid="stButton"] button {
-            background-color: var(--panel-2);
+            background-color: white;
             border: 1px solid var(--border);
-            color: var(--text);
+            color: var(--main-text);
             width: 100%;
             text-align: left;
         }
         div[data-testid="stButton"] button:hover {
-            border-color: #7c8cff;
-            color: #7c8cff;
+            border-color: var(--accent);
+            color: var(--accent);
         }
         </style>
         """,
@@ -90,7 +134,6 @@ with st.sidebar:
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
     st.divider()
     
-    # 🌟 CRITICAL FIX: The live-updating placeholder for token usage
     tracker_placeholder = st.empty()
     try:
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
@@ -105,43 +148,56 @@ with st.sidebar:
 st.title(APP_TITLE)
 st.markdown(f'<p class="app-subtitle">{APP_SUBTITLE}</p>', unsafe_allow_html=True)
 
-# 🌟 NEW UX: FAQ Starter Prompts (Appear only when chat is empty)
+# --- FAQ STARTER PROMPTS ---
 if not st.session_state.messages:
     st.markdown("### 💡 Frequently Asked Questions")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🏆 Who are the top 10 donors by lifetime giving?"):
-            st.session_state.pending_prompt = "Who are the top 10 donors by lifetime giving?"
+        # Updated "giving" to "donating"
+        if st.button("🏆 Who are the top 10 donors by lifetime donating?"):
+            st.session_state.pending_prompt = "Who are the top 10 donors by lifetime donating?"
             st.rerun()
-        if st.button("📊 Can you provide a summary of giving statistics?"):
-            st.session_state.pending_prompt = "Can you provide a summary of our giving statistics?"
+        if st.button("📊 Can you provide a summary of our donating statistics?"):
+            st.session_state.pending_prompt = "Can you provide a summary of our donating statistics?"
             st.rerun()
     with col2:
-        if st.button("⚠️ Show me lapsed donors who haven't given since 2023"):
-            st.session_state.pending_prompt = "Show me lapsed donors who haven't given since 2023."
+        # Updated "given" to "donated"
+        if st.button("⚠️ Show me lapsed donors who haven't donated since 2023"):
+            st.session_state.pending_prompt = "Show me lapsed donors who haven't donated since 2023."
             st.rerun()
         if st.button("🗺️ Show me the geographic distribution of our donors"):
             st.session_state.pending_prompt = "Show me the geographic distribution of our donors."
             st.rerun()
 
-# Render existing messages
-for message in st.session_state.messages:
+# --- RENDER MESSAGES & DOWNLOAD BUTTONS ---
+for idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        # If the message is from the AI, add a download button beneath it
+        if message["role"] == "assistant":
+            csv_data = convert_to_csv(message["content"])
+            is_csv = b',' in csv_data and b'\n' in csv_data
+            file_ext = "csv" if is_csv else "txt"
+            mime_type = "text/csv" if is_csv else "text/plain"
+            
+            st.download_button(
+                label="📥 Download Data",
+                data=csv_data,
+                file_name=f"iasc_data_export_{idx}.{file_ext}",
+                mime=mime_type,
+                key=f"dl_btn_{idx}"
+            )
 
 # --- CHAT INPUT & FILE UPLOADER ---
-# 🌟 NEW UX: accept_file=True puts the '+' icon directly inside the chat bar
 try:
     prompt_input = st.chat_input("Ask about your donor community...", accept_file=True)
 except TypeError:
     prompt_input = st.chat_input("Ask about your donor community...")
-    st.info("💡 Tip: To get the '+' file upload icon inside this chat bar, run `pip install --upgrade streamlit`.")
 
 active_prompt = None
 uploaded_file = None
 
 if prompt_input:
-    # Streamlit 1.43+ returns a dict-like object. Older versions return a plain string.
     if isinstance(prompt_input, str):
         active_prompt = prompt_input
     else:
@@ -173,5 +229,5 @@ if active_prompt:
         response_placeholder.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # 🌟 CRITICAL FIX: Live-update the sidebar tracker immediately
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
+        st.rerun() # Rerun to render the download button for the new message
