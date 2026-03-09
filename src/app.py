@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-# --- PATH BRIDGE ---
+# --- THE PATH BRIDGE ---
 current_dir = Path(__file__).resolve().parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
@@ -21,20 +21,20 @@ if "tracker" not in st.session_state:
 
 # --- SIDEBAR: FILTERS & FAQ ---
 with st.sidebar:
-    st.title("⚙️ Dashboard Settings")
+    st.title("⚙️ Settings")
     selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0)
     
     st.divider()
     st.markdown("### 🔍 Quick Filters")
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
-    state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
+    state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX", "DC", "MD"])
     
     st.divider()
     st.markdown("### ❓ FAQ")
-    with st.expander("How do I find Top Donors?"):
-        st.write("Ask: 'Who are the top 10 donors by total giving?'")
-    with st.expander("Can I analyze files?"):
-        st.write("Yes! Use the '+' icon or uploader below to share PDFs/CSVs.")
+    with st.expander("Who are my Top Donors?"):
+        st.write("Ask: 'Who are the top 10 donors by lifetime giving?'")
+    with st.expander("How do I find lapsed donors?"):
+        st.write("Ask: 'Show me donors who haven't given since 2023.'")
 
     st.divider()
     st.markdown(st.session_state.tracker.format_sidebar())
@@ -51,9 +51,11 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- FILE UPLOAD & CHAT ---
+# --- CHAT INPUT & FILE UPLOADER ---
+# This adds the file upload feature directly in the chat workflow
 with st.container():
-    uploaded_file = st.file_uploader("Upload a donor list or report for analysis", type=['csv', 'pdf', 'txt'])
+    uploaded_file = st.file_uploader("Upload a donor report (CSV/PDF) for AI analysis", type=['csv', 'pdf', 'txt'])
+    
     if prompt := st.chat_input("Ask about your donor community..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -61,7 +63,7 @@ with st.container():
 
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
-            with st.status("Consulting IASC Database...", expanded=True) as status:
+            with st.status("Consulting IASC records...", expanded=True) as status:
                 response, usage = get_response(
                     user_message=prompt,
                     conversation_history=st.session_state.messages[:-1],
@@ -69,7 +71,7 @@ with st.container():
                     session_tracker=st.session_state.tracker,
                     attachment=uploaded_file
                 )
-                status.update(label="Analysis Complete!", state="complete", expanded=False)
+                status.update(label="Complete!", state="complete", expanded=False)
             
             response_placeholder.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
