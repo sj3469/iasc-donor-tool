@@ -18,14 +18,12 @@ from llm import get_response
 from queries import get_summary_statistics
 from token_tracker import SessionTracker
 
-
 st.set_page_config(
     page_title=APP_TITLE,
     page_icon="●",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 
 def inject_css() -> None:
     st.markdown(
@@ -90,4 +88,15 @@ def inject_css() -> None:
         div[data-testid="stTextInput"] input,
         textarea,
         input,
-        div[data-baseweb="select"]
+        div[data-baseweb="select"] {
+            background-color: var(--panel);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Don't forget to call the function so the styles actually apply!
+inject_css()
