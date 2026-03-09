@@ -8,10 +8,12 @@ load_dotenv()
 APP_TITLE = "IASC Donor Analytics"
 APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Review"
 
-# Align with your GitHub data folder
+# Align with your GitHub 'data' folder structure
+# This finds 'data/donors.db' relative to the 'src' folder
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "donors.db"
 
+# Secure Key Retrieval
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 AVAILABLE_MODELS = {
