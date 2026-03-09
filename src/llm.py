@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional, Callable
 from google import genai
 from google.genai import types
 
-# Import tools from the same src folder
+# Import database tools from the local src folder
 from queries import (
     search_donors, get_donor_detail, get_summary_statistics,
     get_geographic_distribution, get_lapsed_donors,
@@ -18,13 +18,13 @@ def get_response(
     st_session_id: Optional[str] = None, attachment: Optional[Any] = None
 ) -> tuple[str, Any]:
     
-    # Initialize Client
+    # Initialize the Gemini Client
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     tools = [search_donors, get_donor_detail, get_summary_statistics,
              get_geographic_distribution, get_lapsed_donors,
              get_prospects_by_potential, plan_fundraising_trip]
 
-    # Convert instructions to a plain string
+    # Clean the system prompt to avoid validation errors
     raw_prompt = build_system_prompt()
     if isinstance(raw_prompt, list):
         system_instruction_text = " ".join([p.get("text", "") if isinstance(p, dict) else str(p) for p in raw_prompt])
@@ -33,6 +33,7 @@ def get_response(
 
     prompt_content = [user_message]
     
+    # Execute with Automatic Function Calling
     response = client.models.generate_content(
         model=model,
         contents=prompt_content,
