@@ -1,163 +1,74 @@
-"""
-Persistent token usage storage.
-
-Logs every API call to a local SQLite database so usage can be queried
-across sessions.
-
-This is a lightweight append-only log; it does not store conversation content,
-only token counts, timestamps, model names, and cost estimates.
-"""
-
-import sqlite3
+from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-DB_PATH = Path(__file__).parent / "usage.db"
+MODEL_PRICING = {
+    "gemini-2.5-flash": {"input_per_mtok": 0.30, "output_per_mtok": 2.50, "display_name": "Gemini 2.5 Flash"},
+    "gemini-2.0-flash": {"input_per_mtok": 0.10, "output_per_mtok": 0.40, "display_name": "Gemini 2.0 Flash"},
+    "gemini-1.5-pro": {"input_per_mtok": 1.25, "output_per_mtok": 10.00, "display_name": "Gemini 1.5 Pro"},
+    "default": {"input_per_mtok": 0.0, "output_per_mtok": 0.0, "display_name": "Unknown Model"},
+}
 
+@dataclass
+class APICall:
+    timestamp: datetime
+    input_tokens: int
+    output_tokens: int
+    model: str
 
-def _get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS api_calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            model TEXT NOT NULL,
-            input_tokens INTEGER NOT NULL,
-            output_tokens INTEGER NOT NULL,
-            cache_creation_input_tokens INTEGER DEFAULT 0,
-            cache_read_input_tokens INTEGER DEFAULT 0,
-            had_tool_use INTEGER DEFAULT 0,
-            latency_ms REAL DEFAULT 0,
-            question TEXT,
-            session_id TEXT
+@dataclass
+class ResponseUsage:
+    question: str
+    calls: List[APICall] = field(default_factory=list)
+
+    @property
+    def total_input_tokens(self) -> int:
+        return sum(c.input_tokens for c in self.calls)
+
+    @property
+    def total_output_tokens(self) -> int:
+        return sum(c.output_tokens for c in self.calls)
+
+    def estimated_cost(self, model: Optional[str] = None) -> float:
+        total_cost = 0.0
+        for call in self.calls:
+            model_key = model or call.model
+            pricing = MODEL_PRICING.get(model_key, MODEL_PRICING["default"])
+            total_cost += (call.input_tokens / 1_000_000) * pricing["input_per_mtok"]
+            total_cost += (call.output_tokens / 1_000_000) * pricing["output_per_mtok"]
+        return total_cost
+
+class SessionTracker:
+    def __init__(self):
+        self.responses: List[ResponseUsage] = []
+
+    def log_call(self, model: str, input_tokens: int, output_tokens: int, question: str = "") -> None:
+        response_usage = ResponseUsage(question=question)
+        response_usage.calls.append(APICall(timestamp=datetime.now(), input_tokens=input_tokens, output_tokens=output_tokens, model=model))
+        self.responses.append(response_usage)
+
+    @property
+    def total_input_tokens(self) -> int: 
+        return sum(r.total_input_tokens for r in self.responses)
+    
+    @property
+    def total_output_tokens(self) -> int: 
+        return sum(r.total_output_tokens for r in self.responses)
+    
+    @property
+    def total_cost(self) -> float: 
+        return sum(r.estimated_cost() for r in self.responses)
+    
+    @property
+    def total_api_calls(self) -> int: 
+        return sum(len(r.calls) for r in self.responses)
+
+    def format_sidebar(self) -> str:
+        return (
+            f"**Session Usage**\n\n"
+            f"- Questions: {len(self.responses)}\n"
+            f"- API Calls: {self.total_api_calls}\n"
+            f"- Input Tokens: {self.total_input_tokens:,}\n"
+            f"- Output Tokens: {self.total_output_tokens:,}\n"
+            f"- Estimated Cost: ${self.total_cost:.4f}"
         )
-        """
-    )
-    conn.commit()
-    return conn
-
-
-def log_api_call(
-    timestamp: datetime,
-    model: str,
-    input_tokens: int,
-    output_tokens: int,
-    cache_creation_input_tokens: int = 0,
-    cache_read_input_tokens: int = 0,
-    had_tool_use: bool = False,
-    latency_ms: float = 0,
-    question: Optional[str] = None,
-    session_id: Optional[str] = None,
-) -> None:
-    """Append one API call record to the persistent log."""
-    conn = _get_connection()
-    conn.execute(
-        """
-        INSERT INTO api_calls
-            (timestamp, model, input_tokens, output_tokens,
-             cache_creation_input_tokens, cache_read_input_tokens,
-             had_tool_use, latency_ms, question, session_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            timestamp.isoformat(),
-            model,
-            input_tokens,
-            output_tokens,
-            cache_creation_input_tokens,
-            cache_read_input_tokens,
-            1 if had_tool_use else 0,
-            latency_ms,
-            question,
-            session_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_usage_summary(
-    since: Optional[str] = None,
-    model: Optional[str] = None,
-) -> dict:
-    """Query cumulative usage statistics."""
-    conn = _get_connection()
-
-    conditions = []
-    params = []
-
-    if since:
-        conditions.append("timestamp >= ?")
-        params.append(since)
-
-    if model:
-        conditions.append("model = ?")
-        params.append(model)
-
-    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-
-    row = conn.execute(
-        f"""
-        SELECT
-            COUNT(*) as total_api_calls,
-            COUNT(DISTINCT session_id) as total_sessions,
-            COUNT(DISTINCT question) as unique_questions,
-            COALESCE(SUM(input_tokens), 0) as total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) as total_output_tokens,
-            COALESCE(SUM(cache_read_input_tokens), 0) as total_cache_read_tokens,
-            COALESCE(SUM(cache_creation_input_tokens), 0) as total_cache_write_tokens,
-            MIN(timestamp) as first_call,
-            MAX(timestamp) as last_call
-        FROM api_calls
-        {where}
-        """,
-        params,
-    ).fetchone()
-
-    result = dict(row)
-
-    model_rows = conn.execute(
-        f"""
-        SELECT
-            model,
-            COUNT(*) as api_calls,
-            COALESCE(SUM(input_tokens), 0) as input_tokens,
-            COALESCE(SUM(output_tokens), 0) as output_tokens,
-            COALESCE(SUM(cache_read_input_tokens), 0) as cache_read_tokens,
-            COALESCE(SUM(cache_creation_input_tokens), 0) as cache_write_tokens
-        FROM api_calls
-        {where}
-        GROUP BY model
-        ORDER BY api_calls DESC
-        """,
-        params,
-    ).fetchall()
-
-    result["by_model"] = [dict(r) for r in model_rows]
-
-    from token_tracker import MODEL_PRICING
-
-    total_cost = 0.0
-    for mr in result["by_model"]:
-        pricing = MODEL_PRICING.get(mr["model"], MODEL_PRICING.get("default", {}))
-        base_rate = pricing.get("input_per_mtok", 0.0)
-        output_rate = pricing.get("output_per_mtok", 0.0)
-
-        cache_read = mr.get("cache_read_tokens", 0) or 0
-        cache_write = mr.get("cache_write_tokens", 0) or 0
-        raw_input = mr.get("input_tokens", 0) or 0
-        regular_input = max(0, raw_input - cache_read - cache_write)
-
-        total_cost += (regular_input / 1_000_000) * base_rate
-        total_cost += (cache_write / 1_000_000) * base_rate * 1.25
-        total_cost += (cache_read / 1_000_000) * base_rate * 0.1
-        total_cost += ((mr.get("output_tokens", 0) or 0) / 1_000_000) * output_rate
-
-    result["estimated_total_cost_usd"] = round(total_cost, 4)
-    result["note"] = "These are rough in-app estimates based on the local pricing table."
-
-    conn.close()
-    return result
