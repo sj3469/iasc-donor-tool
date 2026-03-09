@@ -58,7 +58,7 @@ def convert_to_csv(text):
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
 
-# --- AGGRESSIVE CSS INJECTION ---
+# --- BULLETPROOF CSS INJECTION ---
 def inject_css() -> None:
     st.markdown(
         """
@@ -68,117 +68,99 @@ def inject_css() -> None:
             --main-text: #111827; 
             --border-light: #e5e7eb;
             --focus-grey: #9ca3af;
+            --accent-blue: #0b57d0;
             
             --sidebar-bg: #0b1020; 
             --sidebar-border: #27314a;
             --sidebar-text: #e8ecf7;
         }
         
-        /* 1. FORCE MAIN APP LIGHT (Defeat Streamlit Dark Mode) */
-        .stApp, .main, .block-container { 
-            background-color: var(--main-bg) !important; 
-        }
-        /* Target all text in the main area to be dark grey/black */
-        .main p, .main h1, .main h2, .main h3, .main h4, .main span, .main label, .main li { 
-            color: var(--main-text) !important; 
-        }
+        /* 1. Main App Styling */
+        [data-testid="stAppViewContainer"] { background-color: var(--main-bg) !important; }
+        [data-testid="stAppViewContainer"] h1, 
+        [data-testid="stAppViewContainer"] h2, 
+        [data-testid="stAppViewContainer"] h3, 
+        [data-testid="stAppViewContainer"] p, 
+        [data-testid="stAppViewContainer"] span { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* 2. TOP NAVBAR (Transparent so it blends in, grey icons) */
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-        }
+        /* 2. Top Navbar (Share & 3 Dots) - Dark Grey Icons */
+        header[data-testid="stHeader"] { background: transparent !important; }
         header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
-            color: #6b7280 !important;
-            fill: #6b7280 !important;
+            color: #6b7280 !important; fill: #6b7280 !important;
         }
 
-        /* 3. FORCE SIDEBAR DARK */
-        section[data-testid="stSidebar"], section[data-testid="stSidebar"] > div {
+        /* 3. Sidebar Styling (Forced Dark Navy) */
+        [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
         }
-        section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span, 
-        section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
-            color: var(--sidebar-text) !important;
-        }
-        /* Sidebar Inputs */
-        section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
-        section[data-testid="stSidebar"] div[data-testid="stTextInput"] input {
+        [data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
+        
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div,
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
             border: 1px solid var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
             border-radius: 8px;
         }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+        [data-testid="stSidebar"] div[data-testid="stButton"] button {
             background-color: transparent !important;
             border: 1px solid var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
         }
 
-        /* 4. BOTTOM CHAT AREA (Seamless Background) */
-        div[data-testid="stBottom"], 
-        div[data-testid="stBottom"] > div,
-        div[data-testid="stBottom"] > div > div {
+        /* 4. Seamless Bottom Chat Area */
+        [data-testid="stBottom"], [data-testid="stBottom"] > div {
             background-color: var(--main-bg) !important;
-            background: var(--main-bg) !important;
         }
 
-        /* 5. CHAT INPUT BOX (White pill, Grey focus, Dark Text) */
-        div[data-testid="stChatInput"] {
-            background-color: transparent !important;
-        }
-        div[data-testid="stChatInputContainer"] {
+        /* 5. Chat Input Box (White pill, Grey focus) */
+        [data-testid="stChatInput"] { background-color: transparent !important; }
+        [data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 24px !important;
             padding: 5px 15px !important;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
         }
-        /* Defeat the red focus ring */
-        div[data-testid="stChatInputContainer"]:focus-within {
+        [data-testid="stChatInputContainer"]:focus-within {
             border: 1px solid var(--focus-grey) !important; 
             box-shadow: 0 0 0 1px var(--focus-grey) !important;
             outline: none !important;
         }
-        /* Ensure text typed inside the chat box is dark */
-        div[data-testid="stChatInputContainer"] textarea {
+        [data-testid="stChatInputContainer"] textarea {
             color: var(--main-text) !important;
             -webkit-text-fill-color: var(--main-text) !important;
             background-color: transparent !important;
-            caret-color: var(--main-text) !important;
         }
 
-        /* 6. FAQ BUTTONS (Soft Gemini Style) */
-        .main div[data-testid="stButton"] button {
+        /* 6. FAQ Buttons (Gemini Style) */
+        [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
             background-color: #f0f4f9 !important;
-            border: 1px solid #e5e7eb !important;
+            border: none !important;
             border-radius: 20px !important;
             padding: 10px 20px !important;
             box-shadow: none !important;
         }
-        .main div[data-testid="stButton"] button p {
+        [data-testid="stAppViewContainer"] div[data-testid="stButton"] button p {
             color: #1f1f1f !important;
             font-weight: 400 !important;
         }
-        .main div[data-testid="stButton"] button:hover {
+        [data-testid="stAppViewContainer"] div[data-testid="stButton"] button:hover {
             background-color: #e8f0fe !important;
-            border-color: #d2e3fc !important;
         }
-        .main div[data-testid="stButton"] button:hover p {
-            color: #0b57d0 !important;
+        [data-testid="stAppViewContainer"] div[data-testid="stButton"] button:hover p {
+            color: var(--accent-blue) !important;
         }
         
-        /* 7. DOWNLOAD BUTTON */
+        /* 7. Download Button (Clean & Minimal) */
         .stDownloadButton button {
             background-color: #ffffff !important;
-            border: 1px solid var(--border-light) !important;
+            border: 1px solid #e5e7eb !important;
             border-radius: 8px !important;
-            color: var(--main-text) !important;
         }
-        .stDownloadButton button p {
-            color: var(--main-text) !important;
-        }
+        .stDownloadButton button p { color: #111827 !important; }
         </style>
         """,
         unsafe_allow_html=True
@@ -208,7 +190,6 @@ with st.sidebar:
         st.write("")
         
     st.divider()
-    
     st.markdown("<h4 style='font-size: 14px; font-weight: normal; color: #9aa4bf;'>Settings</h4>", unsafe_allow_html=True)
     
     tracker_placeholder = st.empty()
@@ -253,8 +234,9 @@ for idx, message in enumerate(st.session_state.messages):
             file_ext = "csv" if is_csv else "txt"
             mime_type = "text/csv" if is_csv else "text/plain"
             
+            # Replaced with a classic download icon
             st.download_button(
-                label="⬇ Download Data",
+                label="📥 Download Data",
                 data=csv_data,
                 file_name=f"iasc_data_export_{idx}.{file_ext}",
                 mime=mime_type,
