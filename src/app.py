@@ -58,70 +58,82 @@ def convert_to_csv(text):
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
 
-# --- CSS INJECTION (MINIMAL, SOFT, GEMINI-INSPIRED) ---
+# --- CSS INJECTION (DARK SIDEBAR + LIGHT MAIN) ---
 def inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* Gemini-inspired Soft Color Palette */
         :root { 
-            --main-bg: #ffffff; 
-            --sidebar-bg: #f0f4f9; /* Soft grayish-blue */
-            --text-main: #1f1f1f; 
-            --text-muted: #444746; 
-            --border-color: #e3e3e3; 
-            --accent-blue: #0b57d0; 
-            --accent-hover: #e8f0fe;
+            --main-bg: #f9fafb; /* Soft light background */
+            --main-text: #111827; /* Dark readable text */
+            --border-light: #e5e7eb;
+            --accent-blue: #3b82f6;
+            
+            --sidebar-bg: #0b1020; /* Deep navy */
+            --sidebar-border: #27314a;
+            --sidebar-text: #e8ecf7;
         }
         
-        /* Global Typography & Backgrounds */
-        html, body, [class*="css"] {
-            font-family: "Google Sans", Inter, ui-sans-serif, system-ui, sans-serif;
-            color: var(--text-main);
-        }
-        .stApp { background: var(--main-bg); color: var(--text-main); }
-        .app-subtitle { color: var(--text-muted) !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
+        /* Main App Background & Text */
+        .stApp { background-color: var(--main-bg); color: var(--main-text); }
+        h1, h2, h3, h4, p, span, label, div { color: var(--main-text); }
+        .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* Soft Sidebar */
-        [data-testid="stSidebar"] { 
-            background: var(--sidebar-bg); 
-            border-right: none; /* Removed harsh border */
+        /* Force Sidebar to be Dark */
+        [data-testid="stSidebar"] {
+            background-color: var(--sidebar-bg) !important;
+            border-right: 1px solid var(--sidebar-border) !important;
+        }
+        [data-testid="stSidebar"] * {
+            color: var(--sidebar-text) !important;
         }
         
-        /* Chat Input Box - Pill Shaped & Clean */
+        /* Fix Sidebar Dropdowns */
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
+            background-color: #12182b !important;
+            border-color: var(--sidebar-border) !important;
+            color: var(--sidebar-text) !important;
+        }
+        
+        /* Sidebar Button (Clear Chat) */
+        [data-testid="stSidebar"] div[data-testid="stButton"] button {
+            background-color: transparent !important;
+            border: 1px solid var(--sidebar-border) !important;
+            color: var(--sidebar-text) !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+            border-color: #ef4444 !important;
+            color: #ef4444 !important;
+        }
+
+        /* Chat Input Box - Clean White Pill */
         div[data-testid="stChatInputContainer"] {
-            border: 1px solid var(--border-color) !important;
             background-color: #ffffff !important;
-            border-radius: 24px !important; /* Soft pill shape */
+            border: 1px solid var(--border-light) !important;
+            border-radius: 24px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
             padding: 0.2rem 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        div[data-testid="stChatInputContainer"] textarea {
+            color: var(--main-text) !important;
         }
         div[data-testid="stChatInputContainer"]:focus-within {
-            outline: none !important;
             border-color: var(--accent-blue) !important;
             box-shadow: 0 0 0 1px var(--accent-blue) !important;
         }
 
-        /* Buttons (FAQ & Clear Chat) - Minimal Pill Shape */
-        div[data-testid="stButton"] button {
-            background-color: #ffffff;
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            border-radius: 18px; /* Rounded buttons */
-            font-weight: 500;
-            transition: all 0.2s ease-in-out;
+        /* Main Area Buttons (FAQ & Downloads) */
+        .st-emotion-cache-1vt4ygl div[data-testid="stButton"] button, 
+        .main div[data-testid="stButton"] button {
+            background-color: #ffffff !important;
+            border: 1px solid var(--border-light) !important;
+            color: var(--main-text) !important;
+            border-radius: 12px !important;
         }
-        div[data-testid="stButton"] button:hover {
-            background-color: var(--accent-hover);
-            border-color: var(--accent-hover);
-            color: var(--accent-blue);
-        }
-        
-        /* Dropdowns in Sidebar */
-        div[data-baseweb="select"] > div {
-            background-color: #ffffff;
-            border-color: var(--border-color);
-            border-radius: 8px;
+        .main div[data-testid="stButton"] button:hover {
+            border-color: var(--accent-blue) !important;
+            color: var(--accent-blue) !important;
+            background-color: #f3f8ff !important;
         }
         </style>
         """,
