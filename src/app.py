@@ -62,7 +62,8 @@ def inject_css() -> None:
             color: var(--text);
         }
 
-        /* Top header */
+        /* ---------- top chrome ---------- */
+
         .stApp > header,
         header,
         header[data-testid="stHeader"],
@@ -75,23 +76,47 @@ def inject_css() -> None:
             background: #ffffff !important;
         }
 
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stStatusWidget"] {
+            background: #ffffff !important;
+            color: var(--navy) !important;
+        }
+
         [data-testid="stHeader"] *,
-        [data-testid="stToolbar"] * {
+        [data-testid="stToolbar"] *,
+        [data-testid="stStatusWidget"] * {
             color: var(--navy) !important;
         }
 
         [data-testid="stHeader"] button,
         [data-testid="stToolbar"] button,
-        button[kind="header"] {
+        [data-testid="stStatusWidget"] button,
+        button[kind="header"],
+        button[kind="headerNoPadding"] {
             color: var(--navy) !important;
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
         }
 
+        [data-testid="stHeader"] a,
+        [data-testid="stToolbar"] a,
+        [data-testid="stStatusWidget"] a,
+        [data-testid="stHeader"] span,
+        [data-testid="stToolbar"] span,
+        [data-testid="stStatusWidget"] span,
+        [data-testid="stHeader"] div,
+        [data-testid="stToolbar"] div,
+        [data-testid="stStatusWidget"] div {
+            color: var(--navy) !important;
+        }
+
         [data-testid="stHeader"] svg,
         [data-testid="stToolbar"] svg,
-        button[kind="header"] svg {
+        [data-testid="stStatusWidget"] svg,
+        button[kind="header"] svg,
+        button[kind="headerNoPadding"] svg {
             fill: var(--navy) !important;
             stroke: var(--navy) !important;
             color: var(--navy) !important;
@@ -99,21 +124,29 @@ def inject_css() -> None:
 
         [data-testid="stHeader"] svg *,
         [data-testid="stToolbar"] svg *,
-        button[kind="header"] svg * {
+        [data-testid="stStatusWidget"] svg *,
+        button[kind="header"] svg *,
+        button[kind="headerNoPadding"] svg * {
             fill: var(--navy) !important;
             stroke: var(--navy) !important;
         }
 
-        [data-testid="stHeader"] a,
-        [data-testid="stToolbar"] a,
-        [data-testid="stHeader"] span,
-        [data-testid="stToolbar"] span,
-        [data-testid="stHeader"] div,
-        [data-testid="stToolbar"] div {
-            color: var(--navy) !important;
+        [data-testid="stStatusWidget"] img,
+        [data-testid="stToolbar"] img,
+        [data-testid="stHeader"] img {
+            filter: brightness(0) saturate(100%) invert(8%) sepia(18%) saturate(1111%) hue-rotate(184deg) brightness(94%) contrast(95%) !important;
         }
 
-        /* Sidebar */
+        [data-testid="collapsedControl"] button,
+        [data-testid="collapsedControl"] svg,
+        [data-testid="collapsedControl"] svg * {
+            color: var(--navy) !important;
+            fill: var(--navy) !important;
+            stroke: var(--navy) !important;
+        }
+
+        /* ---------- sidebar ---------- */
+
         [data-testid="stSidebar"] {
             background: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border);
@@ -128,7 +161,52 @@ def inject_css() -> None:
             border-top: 1px solid var(--sidebar-line) !important;
         }
 
-        /* Main layout */
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
+            background: #162033 !important;
+            color: #ffffff !important;
+            border: 1px solid #31415f !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input::placeholder {
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus {
+            border: 1px solid #5e7398 !important;
+            box-shadow: 0 0 0 1px #5e7398 !important;
+            outline: none !important;
+        }
+
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
+            background: #162033 !important;
+            color: #ffffff !important;
+            border: 1px solid #31415f !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            border: 1px solid #31415f !important;
+            background: #162033 !important;
+            border-radius: 14px !important;
+        }
+
+        .usage-box {
+            border: 1px solid #31415f;
+            border-radius: 14px;
+            padding: 0.9rem 1rem;
+            background: #162033;
+        }
+
+        .usage-box div {
+            color: #ffffff !important;
+        }
+
+        /* ---------- main content ---------- */
+
         .block-container {
             max-width: 980px;
             padding-top: 1.25rem;
@@ -170,35 +248,8 @@ def inject_css() -> None:
             margin-bottom: 0.8rem;
         }
 
-        /* Sidebar inputs */
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
-            background: #162033 !important;
-            color: #ffffff !important;
-            border: 1px solid #31415f !important;
-            border-radius: 14px !important;
-            box-shadow: none !important;
-        }
+        /* ---------- buttons ---------- */
 
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input::placeholder {
-            color: #ffffff !important;
-            opacity: 1 !important;
-        }
-
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus {
-            border: 1px solid #5e7398 !important;
-            box-shadow: 0 0 0 1px #5e7398 !important;
-            outline: none !important;
-        }
-
-        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
-            background: #162033 !important;
-            color: #ffffff !important;
-            border: 1px solid #31415f !important;
-            border-radius: 14px !important;
-            box-shadow: none !important;
-        }
-
-        /* Buttons */
         div[data-testid="stButton"] button {
             background: var(--accent) !important;
             color: #ffffff !important;
@@ -212,7 +263,8 @@ def inject_css() -> None:
             border-color: var(--accent-hover) !important;
         }
 
-        /* Chat input */
+        /* ---------- chat input ---------- */
+
         div[data-testid="stChatInput"] {
             background: transparent !important;
         }
@@ -253,28 +305,6 @@ def inject_css() -> None:
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-        }
-
-        /* Usage box */
-        .usage-box {
-            border: 1px solid #31415f;
-            border-radius: 14px;
-            padding: 0.9rem 1rem;
-            background: #162033;
-        }
-
-        .usage-box div {
-            color: #ffffff !important;
-        }
-
-        /* Sidebar expanders */
-        [data-testid="stExpander"] {
-            border-radius: 14px !important;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stExpander"] {
-            border: 1px solid #31415f !important;
-            background: #162033 !important;
         }
         </style>
         """,
