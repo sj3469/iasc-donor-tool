@@ -58,7 +58,7 @@ def convert_to_csv(text):
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
 
-# --- CSS INJECTION (MINIMAL, GREY FOCUS, SEAMLESS BOTTOM) ---
+# --- AGGRESSIVE CSS INJECTION ---
 def inject_css() -> None:
     st.markdown(
         """
@@ -67,60 +67,56 @@ def inject_css() -> None:
             --main-bg: #f9fafb; 
             --main-text: #111827; 
             --border-light: #e5e7eb;
-            --accent-blue: #0b57d0;
-            --focus-grey: #9ca3af; /* Soft grey for the text box */
+            --focus-grey: #9ca3af;
             
             --sidebar-bg: #0b1020; 
             --sidebar-border: #27314a;
             --sidebar-text: #e8ecf7;
         }
         
-        /* Main App Background & Text */
-        .stApp { background-color: var(--main-bg); color: var(--main-text); }
-        h1, h2, h3, h4, p, span, label, div { color: var(--main-text); }
+        /* 1. FORCE MAIN APP LIGHT (Defeat Streamlit Dark Mode) */
+        .stApp, .main, .block-container { 
+            background-color: var(--main-bg) !important; 
+        }
+        /* Target all text in the main area to be dark grey/black */
+        .main p, .main h1, .main h2, .main h3, .main h4, .main span, .main label, .main li { 
+            color: var(--main-text) !important; 
+        }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* Top Navbar (Share & 3 Dots) - Make Icons White */
+        /* 2. TOP NAVBAR (Transparent so it blends in, grey icons) */
         header[data-testid="stHeader"] {
-            background-color: var(--sidebar-bg) !important;
+            background: transparent !important;
         }
-        header[data-testid="stHeader"] button, 
-        header[data-testid="stHeader"] svg,
-        header[data-testid="stHeader"] span {
-            color: #ffffff !important;
-            fill: #ffffff !important;
+        header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
+            color: #6b7280 !important;
+            fill: #6b7280 !important;
         }
-        
-        /* Sidebar Styling */
-        [data-testid="stSidebar"] {
+
+        /* 3. FORCE SIDEBAR DARK */
+        section[data-testid="stSidebar"], section[data-testid="stSidebar"] > div {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
         }
-        [data-testid="stSidebar"] * {
+        section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span, 
+        section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
             color: var(--sidebar-text) !important;
         }
-        
-        /* Sidebar Dropdowns & Inputs */
-        [data-testid="stSidebar"] div[data-baseweb="select"] > div,
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
+        /* Sidebar Inputs */
+        section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+        section[data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
-            border-color: var(--sidebar-border) !important;
+            border: 1px solid var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
             border-radius: 8px;
         }
-        
-        /* Sidebar Button (Clear Chat) */
-        [data-testid="stSidebar"] div[data-testid="stButton"] button {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button {
             background-color: transparent !important;
             border: 1px solid var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
         }
-        [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-            border-color: #ef4444 !important;
-            color: #ef4444 !important;
-        }
 
-        /* Seamless Bottom Chat Background (Aggressive Override) */
+        /* 4. BOTTOM CHAT AREA (Seamless Background) */
         div[data-testid="stBottom"], 
         div[data-testid="stBottom"] > div,
         div[data-testid="stBottom"] > div > div {
@@ -128,44 +124,60 @@ def inject_css() -> None:
             background: var(--main-bg) !important;
         }
 
-        /* Chat Input Box - Clean White Pill with Soft Grey Focus */
+        /* 5. CHAT INPUT BOX (White pill, Grey focus, Dark Text) */
+        div[data-testid="stChatInput"] {
+            background-color: transparent !important;
+        }
         div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
-            border: 1px solid var(--border-light) !important;
+            border: 1px solid #d1d5db !important;
             border-radius: 24px !important;
+            padding: 5px 15px !important;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
-            padding: 0.2rem 0.5rem;
         }
+        /* Defeat the red focus ring */
         div[data-testid="stChatInputContainer"]:focus-within {
-            border-color: var(--focus-grey) !important;
+            border: 1px solid var(--focus-grey) !important; 
             box-shadow: 0 0 0 1px var(--focus-grey) !important;
             outline: none !important;
         }
+        /* Ensure text typed inside the chat box is dark */
+        div[data-testid="stChatInputContainer"] textarea {
+            color: var(--main-text) !important;
+            -webkit-text-fill-color: var(--main-text) !important;
+            background-color: transparent !important;
+            caret-color: var(--main-text) !important;
+        }
 
-        /* Main Area Buttons (FAQ Prompts) - Gemini Style */
+        /* 6. FAQ BUTTONS (Soft Gemini Style) */
         .main div[data-testid="stButton"] button {
             background-color: #f0f4f9 !important;
-            border: none !important; 
+            border: 1px solid #e5e7eb !important;
+            border-radius: 20px !important;
+            padding: 10px 20px !important;
+            box-shadow: none !important;
+        }
+        .main div[data-testid="stButton"] button p {
             color: #1f1f1f !important;
-            border-radius: 20px !important; 
             font-weight: 400 !important;
-            padding: 0.5rem 1rem !important;
         }
         .main div[data-testid="stButton"] button:hover {
-            background-color: #e1e5ea !important;
-            color: var(--accent-blue) !important;
+            background-color: #e8f0fe !important;
+            border-color: #d2e3fc !important;
+        }
+        .main div[data-testid="stButton"] button:hover p {
+            color: #0b57d0 !important;
         }
         
-        /* Download Button Styling */
+        /* 7. DOWNLOAD BUTTON */
         .stDownloadButton button {
             background-color: #ffffff !important;
             border: 1px solid var(--border-light) !important;
             border-radius: 8px !important;
             color: var(--main-text) !important;
         }
-        .stDownloadButton button:hover {
-            border-color: var(--focus-grey) !important;
-            background-color: #f9fafb !important;
+        .stDownloadButton button p {
+            color: var(--main-text) !important;
         }
         </style>
         """,
@@ -181,7 +193,7 @@ if "tracker" not in st.session_state:
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None
 
-# --- SIDEBAR (Reorganized for Gemini UX) ---
+# --- SIDEBAR ---
 with st.sidebar:
     selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
     st.text_input("Search", placeholder="🔍 Search threads...", label_visibility="collapsed")
@@ -241,7 +253,6 @@ for idx, message in enumerate(st.session_state.messages):
             file_ext = "csv" if is_csv else "txt"
             mime_type = "text/csv" if is_csv else "text/plain"
             
-            # Replaced the emoji with a classic arrow
             st.download_button(
                 label="⬇ Download Data",
                 data=csv_data,
