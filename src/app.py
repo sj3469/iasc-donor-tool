@@ -41,7 +41,6 @@ if not DB_PATH.exists():
 
 # --- HELPER: CSV PARSER ---
 def convert_to_csv(text):
-    """Extracts markdown tables from the AI response and converts them to CSV."""
     lines = text.strip().split('\n')
     csv_lines = []
     for line in lines:
@@ -53,7 +52,6 @@ def convert_to_csv(text):
             row = [col.strip().replace('"', '""') for col in line.split('|')]
             csv_row = ','.join(f'"{col}"' if ',' in col else col for col in row)
             csv_lines.append(csv_row)
-    
     if csv_lines:
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
@@ -64,7 +62,7 @@ def inject_css() -> None:
         """
         <style>
         :root { 
-            --main-bg: #f9fafb; 
+            --main-bg: #ffffff; 
             --main-text: #111827; 
             --border-light: #e5e7eb;
             --focus-grey: #9ca3af;
@@ -72,10 +70,10 @@ def inject_css() -> None:
             
             --sidebar-bg: #0b1020; 
             --sidebar-border: #27314a;
-            --sidebar-text: #e8ecf7;
+            --sidebar-text: #ffffff;
         }
         
-        /* 1. Main App Styling */
+        /* 1. Main App Styling (Force Light) */
         [data-testid="stAppViewContainer"] { background-color: var(--main-bg) !important; }
         [data-testid="stAppViewContainer"] h1, 
         [data-testid="stAppViewContainer"] h2, 
@@ -84,64 +82,71 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] span { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* 2. Top Navbar (Share & 3 Dots) - Dark Grey Icons */
+        /* 2. Top Navbar (Clean Grey Icons on White Background) */
         header[data-testid="stHeader"] { background: transparent !important; }
-        header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
+        header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg, header[data-testid="stHeader"] span {
             color: #6b7280 !important; fill: #6b7280 !important;
         }
 
-        /* 3. Sidebar Styling (Forced Dark Navy) */
+        /* 3. Sidebar Styling (Force Dark Background & Bright Text) */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
         }
-        [data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
-        
+        [data-testid="stSidebar"] * { 
+            color: var(--sidebar-text) !important; 
+        }
+        /* Sidebar Inputs */
         [data-testid="stSidebar"] div[data-baseweb="select"] > div,
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
             border: 1px solid var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
             border-radius: 8px;
-        }
-        [data-testid="stSidebar"] div[data-testid="stButton"] button {
-            background-color: transparent !important;
-            border: 1px solid var(--sidebar-border) !important;
-            color: var(--sidebar-text) !important;
+            -webkit-text-fill-color: var(--sidebar-text) !important;
         }
 
-        /* 4. Seamless Bottom Chat Area */
-        [data-testid="stBottom"], [data-testid="stBottom"] > div {
+        /* 4. Bottom Chat Area (Force absolute white background) */
+        [data-testid="stBottom"], 
+        [data-testid="stBottom"] > div,
+        [data-testid="stBottom"] > div > div {
             background-color: var(--main-bg) !important;
+            background: var(--main-bg) !important;
+            border-top: none !important;
         }
 
-        /* 5. Chat Input Box (White pill, Grey focus) */
-        [data-testid="stChatInput"] { background-color: transparent !important; }
-        [data-testid="stChatInputContainer"] {
+        /* 5. Chat Input Box (Force White Pill, Grey Focus) */
+        div[data-testid="stChatInput"] { 
+            background-color: transparent !important; 
+        }
+        div[data-testid="stChatInputContainer"], 
+        div[data-testid="stChatInputContainer"] > div {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 24px !important;
-            padding: 5px 15px !important;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
         }
-        [data-testid="stChatInputContainer"]:focus-within {
+        div[data-testid="stChatInputContainer"]:focus-within {
             border: 1px solid var(--focus-grey) !important; 
             box-shadow: 0 0 0 1px var(--focus-grey) !important;
             outline: none !important;
         }
-        [data-testid="stChatInputContainer"] textarea {
+        div[data-testid="stChatInputContainer"] textarea {
             color: var(--main-text) !important;
             -webkit-text-fill-color: var(--main-text) !important;
             background-color: transparent !important;
         }
+        div[data-testid="stChatInputContainer"] button svg {
+            fill: #6b7280 !important;
+            color: #6b7280 !important;
+        }
 
-        /* 6. FAQ Buttons (Gemini Style) */
+        /* 6. FAQ Buttons */
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
             background-color: #f0f4f9 !important;
             border: none !important;
             border-radius: 20px !important;
             padding: 10px 20px !important;
-            box-shadow: none !important;
         }
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button p {
             color: #1f1f1f !important;
@@ -154,7 +159,7 @@ def inject_css() -> None:
             color: var(--accent-blue) !important;
         }
         
-        /* 7. Download Button (Clean & Minimal) */
+        /* 7. Download Button */
         .stDownloadButton button {
             background-color: #ffffff !important;
             border: 1px solid #e5e7eb !important;
@@ -234,7 +239,6 @@ for idx, message in enumerate(st.session_state.messages):
             file_ext = "csv" if is_csv else "txt"
             mime_type = "text/csv" if is_csv else "text/plain"
             
-            # Replaced with a classic download icon
             st.download_button(
                 label="📥 Download Data",
                 data=csv_data,
