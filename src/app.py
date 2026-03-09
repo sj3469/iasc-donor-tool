@@ -3,11 +3,12 @@ import os
 import sys
 from pathlib import Path
 
-# --- THE IMPORT FIX ---
-# This tells Streamlit to look in the 'src' folder for your other files
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.append(str(current_dir))
+# --- THE PATH BRIDGE ---
+# This ensures Streamlit can "see" your other files in the src folder
+file_path = Path(__file__).resolve()
+src_dir = file_path.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
 # Now these imports will finally work
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
