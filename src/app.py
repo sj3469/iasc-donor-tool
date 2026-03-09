@@ -1,48 +1,67 @@
+import streamlit as st
 import os
-from typing import List, Dict, Any, Optional, Callable
-from google import genai
-from google.genai import types
+import sys
+from pathlib import Path
 
-from queries import (
-    search_donors, get_donor_detail, get_summary_statistics,
-    get_geographic_distribution, get_lapsed_donors,
-    get_prospects_by_potential, plan_fundraising_trip
-)
-from prompts import build_system_prompt
+# Add the current directory to the system path to fix ImportErrors
+sys.path.append(str(Path(__file__).parent))
 
-def get_response(
-    user_message: str, conversation_history: List[Dict[str, str]],
-    model: str, session_tracker: Any,
-    progress_callback: Optional[Callable[[str], None]] = None,
-    st_session_id: Optional[str] = None, attachment: Optional[Any] = None
-) -> tuple[str, Any]:
-    
-    # Initialize Client
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    tools = [search_donors, get_donor_detail, get_summary_statistics,
-             get_geographic_distribution, get_lapsed_donors,
-             get_prospects_by_potential, plan_fundraising_trip]
+# Now import project files
+from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
+from llm import get_response
+from token_tracker import SessionTokenTracker
 
-    # Convert instructions to a plain string
-    raw_prompt = build_system_prompt()
-    if isinstance(raw_prompt, list):
-        system_instruction_text = " ".join([p.get("text", "") if isinstance(p, dict) else str(p) for p in raw_prompt])
-    else:
-        system_instruction_text = str(raw_prompt)
+# 1. Page Configuration
+st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 
-    prompt_content = [user_message]
-    
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt_content,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction_text,
-            tools=tools,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig()
-        )
+# 2. Initialize Session States
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "tracker" not in st.session_state:
+    st.session_state.tracker = SessionTokenTracker()
+
+# 3. Sidebar UI
+with st.sidebar:
+    st.title("⚙️ Settings")
+    selected_model = st.selectbox(
+        "Select Model", 
+        list(AVAILABLE_MODELS.keys()), 
+        format_func=lambda x: AVAILABLE_MODELS[x], 
+        index=list(AVAILABLE_MODELS.keys()).index(DEFAULT_MODEL)
     )
+    
+    st.divider()
+    st.markdown("### 📁 Data Source")
+    st.info("Connected: `mock_dataset3.csv`")
+    
+    if st.button("Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
 
-    usage = response.usage_metadata
-    session_tracker.log_call(model=model, input_tokens=usage.prompt_token_count, output_tokens=usage.candidates_token_count)
+# 4. Main UI Header [Restores your missing titles]
+st.title(APP_TITLE)
+st.subheader(APP_SUBTITLE)
 
-    return response.text, usage
+# 5. Chat Interface
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Ask about your donor community..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        with st.status("Analyzing IASC database...", expanded=True) as status:
+            response, usage = get_response(
+                user_message=prompt,
+                conversation_history=st.session_state.messages[:-1],
+                model=selected_model,
+                session_tracker=st.session_state.tracker
+            )
+            status.update(label="Analysis Complete!", state="complete", expanded=False)
+        
+        response_placeholder.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
