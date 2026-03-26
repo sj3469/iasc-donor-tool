@@ -156,6 +156,9 @@ with st.sidebar:
 
     # Clear conversation
     st.divider()
+    st.caption("⚠️ All data is synthetic. No real donor information is used.")
+
+    st.divider()
     if st.button("Clear conversation", use_container_width=True):
         st.session_state.messages = []
         st.session_state.tracker = SessionTracker()
@@ -165,6 +168,14 @@ with st.sidebar:
 
 st.header(APP_TITLE)
 st.caption(APP_SUBTITLE)
+
+st.warning(
+    "**Synthetic data only.** All donor names, contact details, gift amounts, and "
+    "engagement records shown here are computer-generated and fictitious. This prototype "
+    "does not contain real IASC donor information, confidential fundraising data, or "
+    "personally identifiable information of any kind.",
+    icon="⚠️",
+)
 
 # Render the full conversation history
 for msg in st.session_state.messages:
