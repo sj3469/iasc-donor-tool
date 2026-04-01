@@ -1,0 +1,49 @@
+import sqlite3
+import pandas as pd
+from pathlib import Path
+import sys
+
+# Since this script is in iasc-donor-tool/data/
+# The root is ONE level up.
+current_dir = Path(__file__).resolve().parent
+root_dir = current_dir.parent
+
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
+import config
+
+# The CSVs are in the exact same folder as this script
+DATA_DIR = current_dir
+DB_PATH = config.DB_PATH
+
+def load_csvs_to_db():
+    print(f"Connecting to database at: {DB_PATH}")
+    conn = sqlite3.connect(str(DB_PATH))
+
+    # The exact filenames based on your screenshot
+    csv_to_table_map = {
+        "synthetic_donors_contacts.csv": "contacts",
+        "synthetic_donors_gifts.csv": "gifts",
+        "synthetic_donors_interactions.csv": "interactions"
+    }
+
+    for csv_filename, table_name in csv_to_table_map.items():
+        csv_path = DATA_DIR / csv_filename
+        
+        if csv_path.exists():
+            print(f"Processing {csv_filename} into table '{table_name}'...")
+            try:
+                df = pd.read_csv(csv_path)
+                df.to_sql(table_name, conn, if_exists='replace', index=False)
+                print(f"✅ Successfully loaded {len(df):,} records into the '{table_name}' table.")
+            except Exception as e:
+                print(f"❌ Error loading {csv_filename}: {e}")
+        else:
+            print(f"⚠️ Skipping {csv_filename}: File not found in {DATA_DIR}.")
+
+    conn.close()
+    print("\nDatabase build complete! Ready for testing.")
+
+if __name__ == "__main__":
+    load_csvs_to_db()
